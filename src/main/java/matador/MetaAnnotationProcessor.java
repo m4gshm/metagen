@@ -1,33 +1,27 @@
 package matador;
 
+import io.jbock.javapoet.JavaFile;
+import io.jbock.javapoet.TypeSpec;
+import lombok.SneakyThrows;
+import matador.Bean.Output;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
+import javax.tools.JavaFileObject;
+import java.io.PrintWriter;
 import java.util.*;
 
 import static java.beans.Introspector.decapitalize;
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.element.Modifier.*;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 
 @SupportedAnnotationTypes("matador.Meta")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
-public class SimpleAnnotationProcessor extends AbstractProcessor {
-    private static ExecutableElement getIfGetterOrSetter(ExecutableElement executableElement) {
-        return isGetterOrSetter(executableElement) ? executableElement : null;
-    }
-
-    private static boolean isGetterOrSetter(ExecutableElement executableElement) {
-        var getter = isGetter(executableElement);
-        var setter = isSetter(executableElement);
-        var boolGetter = isBoolGetter(executableElement);
-        return getter || setter || boolGetter;
-    }
+public class MetaAnnotationProcessor extends AbstractProcessor {
 
     private static boolean isBoolGetter(ExecutableElement executableElement) {
         var name = getMethodName(executableElement);
@@ -56,12 +50,36 @@ public class SimpleAnnotationProcessor extends AbstractProcessor {
         return properties.computeIfAbsent(propName, name -> Bean.Property.builder().name(name).build());
     }
 
+    private static PackageElement getPackage(TypeElement type) {
+        var enclosingElement = type.getEnclosingElement();
+        while (!(enclosingElement instanceof PackageElement) && enclosingElement != null) {
+            enclosingElement = enclosingElement.getEnclosingElement();
+        }
+        return (PackageElement) enclosingElement;
+    }
+
+    private static JavaFileObject newJavaFileObject(Bean bean) {
+        var output = bean.getOutput();
+        var fields = TypeSpec.enumBuilder("Fields");
+        for (var property : bean.getProperties()) {
+            fields.addEnumConstant(property.getName());
+        }
+
+        var javaFile = JavaFile.builder(output.getPackage(), TypeSpec.classBuilder(output.getName())
+                .addModifiers(PUBLIC, FINAL)
+                .addType(fields
+                        .build())
+                .build()).build();
+        return javaFile.toJavaFileObject();
+    }
+
     @Override
-    public boolean process(final Set<? extends TypeElement> annotations,
-                           final RoundEnvironment roundEnv) {
+    @SneakyThrows
+    public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
 
         var elements = roundEnv.getElementsAnnotatedWith(Meta.class);
         var beans = elements.stream().map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull).map(type -> {
+            var recordComponents = type.getRecordComponents();
             var properties = new LinkedHashMap<String, Bean.Property>();
             var enclosedElements = type.getEnclosedElements();
             for (var enclosedElement : enclosedElements) {
@@ -88,11 +106,34 @@ public class SimpleAnnotationProcessor extends AbstractProcessor {
                 }
             }
             var meta = type.getAnnotation(Meta.class);
+            var suffix = meta.suffix();
+            var simpleName = type.getSimpleName();
+
+            var packageElement = getPackage(type);
+
+            var name = simpleName.toString();
+            var metaName = name + suffix;
+            var pack = packageElement != null ? packageElement.getQualifiedName().toString() : null;
             return Bean.builder()
-                    .name(type.getQualifiedName().toString())
+                    .name(name)
+                    .output(Output.builder().name(metaName).package_(pack).build())
                     .properties(new ArrayList<>(properties.values()))
                     .build();
         }).toList();
+
+
+        for (var bean : beans) {
+            var output = bean.getOutput();
+
+            var javaFileObject = newJavaFileObject(bean);
+
+            var builderFile = processingEnv.getFiler().createSourceFile(output.getPackage() + "." + output.getName());
+            try (var out = new PrintWriter(builderFile.openWriter())) {
+                var reader = javaFileObject.openReader(true);
+                reader.transferTo(out);
+            }
+        }
+
 
         return true;
     }
