@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import javax.lang.model.element.Modifier;
+import javax.lang.model.type.TypeMirror;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,7 @@ public class Bean {
         private boolean setter;
         private boolean getter;
         private boolean field;
-        private String type;
+        private TypeMirror type;
     }
 
 
