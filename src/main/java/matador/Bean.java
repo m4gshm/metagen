@@ -3,13 +3,22 @@ package matador;
 import lombok.Builder;
 import lombok.Data;
 
+import javax.lang.model.element.Modifier;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Data
 @Builder
 public class Bean {
     private String name;
+    private Set<Modifier> modifiers;
     private List<Property> properties;
+    private List<Bean> types;
+    private Map<String, List<Param>> typeParameters;
+    private boolean isRecord;
+
     private Output output;
 
     @Data
@@ -19,6 +28,7 @@ public class Bean {
         private boolean setter;
         private boolean getter;
         private boolean field;
+        private String type;
     }
 
 
@@ -35,5 +45,12 @@ public class Bean {
         public void setPackage(String value) {
             this.package_ = value;
         }
+    }
+
+    @Data
+    @Builder
+    public static final class Param {
+        private String name;
+        private String type;
     }
 }

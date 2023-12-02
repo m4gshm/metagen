@@ -1,16 +1,13 @@
 package example.model;
 
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import matador.Meta;
 
 @Meta
 @Data
-public class SomeEntity {
-    public long id;
+@EqualsAndHashCode(callSuper = true)
+public class UserEntity extends Entity<Long> implements IdAware<Long> {
     String name;
     Integer age;
 
@@ -20,6 +17,5 @@ public class SomeEntity {
 
     @Meta
     public static record Address(String postalCode, String city, String street) {
-
     }
 }
