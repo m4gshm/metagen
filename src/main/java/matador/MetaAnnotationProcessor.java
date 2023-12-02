@@ -17,40 +17,20 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.IntersectionType;
-import javax.lang.model.type.PrimitiveType;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.*;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
-import static io.jbock.javapoet.TypeSpec.Builder;
-import static io.jbock.javapoet.TypeSpec.anonymousClassBuilder;
-import static io.jbock.javapoet.TypeSpec.classBuilder;
-import static io.jbock.javapoet.TypeSpec.enumBuilder;
+import static io.jbock.javapoet.TypeSpec.*;
 import static java.beans.Introspector.decapitalize;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PROTECTED;
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.element.Modifier.*;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 
 @SupportedAnnotationTypes("matador.Meta")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class MetaAnnotationProcessor extends AbstractProcessor {
-
-    private String fieldsEnumName = "Fields";
-    private String typeParametersName = "Params";
 
     private static boolean isBoolGetter(ExecutableElement executableElement) {
         var name = getMethodName(executableElement);
@@ -91,11 +71,21 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         var isRecord = type.getRecordComponents() != null;
 
         var properties = new LinkedHashMap<String, Property>();
-        var typeParameters = new LinkedHashMap<String, List<Bean.Param>>();
+        var typeParameters = new ArrayList<Bean.Param>();
         var nestedTypes = new ArrayList<Bean>();
 
-        extractPropertiesAndNestedTypes(type, properties, typeParameters, nestedTypes);
         var meta = type.getAnnotation(Meta.class);
+
+        TypeMirror superclass = type.getSuperclass();
+        if (superclass instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement sup
+                && !isObjectType(sup)) {
+            var typeElem = getTypeInfo(superclass);
+            typeParameters.addAll(extractGenericParams(declaredType, sup));
+        }
+
+        extractPropertiesAndNestedTypes(type, properties, nestedTypes);
+
         var suffix = meta.suffix();
         var simpleName = type.getSimpleName();
 
@@ -104,32 +94,34 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         var name = simpleName.toString();
         var metaName = name + suffix;
         var pack = packageElement != null ? packageElement.getQualifiedName().toString() : null;
-        return Bean.builder().name(name).modifiers(type.getModifiers()).isRecord(isRecord).typeParameters(typeParameters).properties(new ArrayList<>(properties.values())).types(nestedTypes).output(Output.builder().name(metaName).package_(pack).build()).build();
+        return Bean.builder()
+                .meta(meta)
+                .name(name)
+                .modifiers(type.getModifiers())
+                .isRecord(isRecord)
+                .typeParameters(typeParameters)
+                .properties(new ArrayList<>(properties.values()))
+                .types(nestedTypes)
+                .output(Output.builder().name(metaName).package_(pack).build())
+                .build();
     }
 
-    private static void extractPropertiesAndNestedTypes(TypeElement type, Map<String, Property> properties, Map<String, List<Bean.Param>> typeParameters, List<Bean> nestedTypes) {
+    private static void extractPropertiesAndNestedTypes(TypeElement type,
+                                                        Map<String, Property> properties,
+                                                        List<Bean> nestedTypes) {
         if (type == null || isObjectType(type)) {
             return;
         }
 
-        if (type.getSuperclass() instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement sup && !isObjectType(sup)) {
-            var arguments = declaredType.getTypeArguments();
-            var parameters = sup.getTypeParameters();
+        var interfaces = type.getInterfaces();
+        interfaces.stream().map(MetaAnnotationProcessor::getTypeInfo).filter(Objects::nonNull).forEach(iface -> {
+            var params = extractGenericParams(iface.declaredType, iface.typeElement);
+            extractPropertiesAndNestedTypes(iface.typeElement, properties, nestedTypes);
+        });
 
-            var params = new ArrayList<Bean.Param>();
-            for (int i = 0; i < arguments.size(); i++) {
-                var paramType = arguments.get(i);
-                var paramName = parameters.get(i);
-
-                if (paramType instanceof DeclaredType declType && declType.asElement() instanceof TypeElement typ) {
-                    var name = paramName.getSimpleName().toString();
-                    var fullType = typ.getQualifiedName().toString();
-                    var param = Bean.Param.builder().name(name).type(fullType).build();
-                    params.add(param);
-                }
-            }
-            typeParameters.put("superclass", params);
-            extractPropertiesAndNestedTypes(sup, properties, typeParameters, nestedTypes);
+        var superclass = getTypeInfo(type.getSuperclass());
+        if (superclass != null) {
+            extractPropertiesAndNestedTypes(superclass.typeElement, properties, nestedTypes);
         }
 
         var recordComponents = type.getRecordComponents();
@@ -152,7 +144,9 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                 var getter = isGetter(ee);
                 var setter = isSetter(ee);
                 var boolGetter = isBoolGetter(ee);
-                var propName = getter ? getPropertyName("get", ee) : boolGetter ? getPropertyName("is", ee) : setter ? getPropertyName("set", ee) : null;
+                var propName = getter ? getPropertyName("get", ee)
+                        : boolGetter ? getPropertyName("is", ee)
+                        : setter ? getPropertyName("set", ee) : null;
                 if (propName != null) {
                     final TypeMirror propType;
                     if (getter || boolGetter) {
@@ -164,7 +158,8 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                             propType = element.asType();
                         } else if (parameters.size() == 2) {
                             var first = parameters.get(0);
-                            var isIndex = first.asType() instanceof PrimitiveType primitiveType && "int".equals(primitiveType.toString());
+                            var isIndex = first.asType() instanceof PrimitiveType primitiveType
+                                    && "int".equals(primitiveType.toString());
                             propType = isIndex ? parameters.get(1).asType() : null;
                         } else {
                             propType = null;
@@ -187,13 +182,36 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         }
     }
 
+    private static TypInfo getTypeInfo(TypeMirror typeMirror) {
+        return typeMirror instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement typeElement
+                && !isObjectType(typeElement) ? new TypInfo(declaredType, typeElement) : null;
+    }
+
+    private static List<Bean.Param> extractGenericParams(DeclaredType declaredType, TypeElement typeElement) {
+        var arguments = declaredType.getTypeArguments();
+        var parameters = typeElement.getTypeParameters();
+
+        var params = new ArrayList<Bean.Param>();
+        for (int i = 0; i < arguments.size(); i++) {
+            var paramType = arguments.get(i);
+            var paramName = parameters.get(i);
+            params.add(Bean.Param.builder()
+                    .name(paramName.getSimpleName().toString())
+                    .type(paramType)
+                    .type(paramType)
+                    .build());
+        }
+        return params;
+    }
+
     private static void updateType(Property property, TypeMirror propType) {
         var existType = property.getType();
         if (existType == null) {
             property.setType(propType);
         } else if (!existType.equals(propType)) {
             //todo set Object or shared parent type
-            property.setType(null);
+//            property.setType(null);
         }
     }
 
@@ -214,40 +232,48 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
     }
 
     private static String getStrType(TypeMirror type) {
-        return type instanceof TypeVariable typeVariable ? getStrType(typeVariable.getUpperBound()) : type instanceof IntersectionType intersectionType ? getStrType(intersectionType.getBounds().get(0)) : type instanceof ArrayType || type instanceof DeclaredType || type instanceof PrimitiveType ? type.toString() : null;
+        return type instanceof TypeVariable typeVariable ? getStrType(typeVariable.getUpperBound())
+                : type instanceof IntersectionType intersectionType ? getStrType(intersectionType.getBounds().get(0))
+                : type instanceof ArrayType || type instanceof DeclaredType || type instanceof PrimitiveType
+                ? type.toString() : null;
     }
 
     private TypeSpec newTypeSpec(Bean bean) {
-        var typesBuilder = typesEnumBuilder(typeParametersName);
-        var addTypes = false;
+        var meta = bean.getMeta();
+        var addFieldsEnum = meta.fields().enumerate();
+        var addParamsEnum = meta.params().enumerate();
 
-        var typeParameters = bean.getTypeParameters();
-        for (var subType : typeParameters.keySet()) {
-            var params = typeParameters.get(subType);
-            if ("superclass".equals(subType)) {
-                for (var param : params) {
-                    addTypes = true;
-                    typesBuilder.addEnumConstant(param.getName(), enumConstructor(dotClass(param.getType())));
-                }
+        var builder = classBuilder(bean.getOutput().getName())
+                .addMethod(constructorBuilder().addModifiers(PRIVATE).build())
+                .addModifiers(FINAL);
+
+        if (addParamsEnum) {
+            var typesBuilder = typesEnumBuilder(meta.params().className());
+            var typeParameters = bean.getTypeParameters();
+            for (var param : typeParameters) {
+                typesBuilder.addEnumConstant(param.getName(), enumConstructor(dotClass(getStrType(param.getType()))));
+            }
+
+            if (!typeParameters.isEmpty()) {
+                builder.addType(typesBuilder.build());
             }
         }
 
-        var fieldsBuilder = fieldsEnumBuilder(fieldsEnumName);
-        var properties = bean.getProperties();
-        for (var property : properties) {
-            fieldsBuilder.addEnumConstant(property.getName(), enumConstructor(dotClass(getStrType(property.getType()))));
-        }
+        if (addFieldsEnum) {
+            var fieldsBuilder = fieldsEnumBuilder(meta.fields().className());
+            var properties = bean.getProperties();
+            for (var property : properties) {
+                fieldsBuilder.addEnumConstant(property.getName(), enumConstructor(dotClass(getStrType(property.getType()))));
+            }
 
-        var builder = classBuilder(bean.getOutput().getName()).addMethod(constructorBuilder().addModifiers(PRIVATE).build()).addModifiers(FINAL);
-
-        if (addTypes) {
-            builder.addType(typesBuilder.build());
-        }
-        if (!properties.isEmpty()) {
-            builder.addType(fieldsBuilder.build());
+            if (!properties.isEmpty()) {
+                builder.addType(fieldsBuilder.build());
+            }
         }
         var modifiers = bean.getModifiers();
-        var accessLevel = modifiers.contains(PRIVATE) ? PRIVATE : modifiers.contains(PROTECTED) ? PROTECTED : modifiers.contains(PUBLIC) ? PUBLIC : null;
+        var accessLevel = modifiers.contains(PRIVATE) ? PRIVATE
+                : modifiers.contains(PROTECTED) ? PROTECTED
+                : modifiers.contains(PUBLIC) ? PUBLIC : null;
         if (accessLevel != null) {
             builder.addModifiers(accessLevel);
         }
@@ -262,35 +288,58 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
     private Builder typesEnumBuilder(String enumName) {
         var typeType = classType();
         var typeName = "type";
-        return enumBuilder(enumName).addModifiers(PUBLIC).addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build()).addMethod(constructorBuilder().addParameter(typeType, typeName).addCode(CodeBlock.builder().add("this." + typeName + " = " + typeName + ";").build()).build());
+        return enumBuilder(enumName)
+                .addModifiers(PUBLIC)
+                .addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build())
+                .addMethod(
+                        constructorBuilder()
+                                .addParameter(typeType, typeName)
+                                .addCode(CodeBlock.builder()
+                                        .add("this." + typeName + " = " + typeName + ";")
+                                        .build())
+                                .build()
+                );
     }
 
     private Builder fieldsEnumBuilder(String enumName) {
         var typeType = classType();
         var typeName = "type";
-        return enumBuilder(enumName).addModifiers(PUBLIC).addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build()).addMethod(constructorBuilder().addParameter(typeType, typeName).addCode(CodeBlock.builder().add("this." + typeName + " = " + typeName + ";").build()).build());
+        return enumBuilder(enumName)
+                .addModifiers(PUBLIC)
+                .addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build())
+                .addMethod(
+                        constructorBuilder()
+                                .addParameter(typeType, typeName)
+                                .addCode(CodeBlock.builder()
+                                        .add("this." + typeName + " = " + typeName + ";")
+                                        .build())
+                                .build()
+                );
     }
-
 
     @Override
     @SneakyThrows
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         var elements = roundEnv.getElementsAnnotatedWith(Meta.class);
-        var beans = elements.stream().map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull).filter(type -> type.getEnclosingElement() instanceof PackageElement).map(MetaAnnotationProcessor::getBean).toList();
+        var beans = elements.stream()
+                .map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull)
+                .filter(type -> type.getEnclosingElement() instanceof PackageElement)
+                .map(MetaAnnotationProcessor::getBean).toList();
 
         for (var bean : beans) {
             var output = bean.getOutput();
-
             var javaFileObject = JavaFile.builder(bean.getOutput().getPackage(), newTypeSpec(bean)).build().toJavaFileObject();
-
             var builderFile = processingEnv.getFiler().createSourceFile(output.getPackage() + "." + output.getName());
             try (var out = new PrintWriter(builderFile.openWriter());
                  var reader = javaFileObject.openReader(true)) {
                 reader.transferTo(out);
             }
         }
-
         return true;
+    }
+
+    private record TypInfo(DeclaredType declaredType, TypeElement typeElement) {
+
     }
 
 }

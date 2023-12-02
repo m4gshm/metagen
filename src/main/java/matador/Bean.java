@@ -5,9 +5,7 @@ import lombok.Data;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.type.TypeMirror;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Data
@@ -17,10 +15,11 @@ public class Bean {
     private Set<Modifier> modifiers;
     private List<Property> properties;
     private List<Bean> types;
-    private Map<String, List<Param>> typeParameters;
+    private List<Param> typeParameters;
     private boolean isRecord;
 
     private Output output;
+    private Meta meta;
 
     @Data
     @Builder
@@ -52,6 +51,6 @@ public class Bean {
     @Builder
     public static final class Param {
         private String name;
-        private String type;
+        private TypeMirror type;
     }
 }
