@@ -104,29 +104,15 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         var name = simpleName.toString();
         var metaName = name + suffix;
         var pack = packageElement != null ? packageElement.getQualifiedName().toString() : null;
-        return Bean.builder()
-                .name(name)
-                .modifiers(type.getModifiers())
-                .isRecord(isRecord)
-                .typeParameters(typeParameters)
-                .properties(new ArrayList<>(properties.values()))
-                .types(nestedTypes)
-                .output(Output.builder().name(metaName).package_(pack).build())
-                .build();
+        return Bean.builder().name(name).modifiers(type.getModifiers()).isRecord(isRecord).typeParameters(typeParameters).properties(new ArrayList<>(properties.values())).types(nestedTypes).output(Output.builder().name(metaName).package_(pack).build()).build();
     }
 
-    private static void extractPropertiesAndNestedTypes(TypeElement type,
-                                                        Map<String, Property> properties,
-                                                        Map<String, List<Bean.Param>> typeParameters,
-                                                        List<Bean> nestedTypes
-    ) {
+    private static void extractPropertiesAndNestedTypes(TypeElement type, Map<String, Property> properties, Map<String, List<Bean.Param>> typeParameters, List<Bean> nestedTypes) {
         if (type == null || isObjectType(type)) {
             return;
         }
 
-        if (type.getSuperclass() instanceof DeclaredType declaredType
-                && declaredType.asElement() instanceof TypeElement sup
-                && !isObjectType(sup)) {
+        if (type.getSuperclass() instanceof DeclaredType declaredType && declaredType.asElement() instanceof TypeElement sup && !isObjectType(sup)) {
             var arguments = declaredType.getTypeArguments();
             var parameters = sup.getTypeParameters();
 
@@ -166,10 +152,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                 var getter = isGetter(ee);
                 var setter = isSetter(ee);
                 var boolGetter = isBoolGetter(ee);
-                var propName = getter ? getPropertyName("get", ee)
-                        : boolGetter ? getPropertyName("is", ee)
-                        : setter ? getPropertyName("set", ee)
-                        : null;
+                var propName = getter ? getPropertyName("get", ee) : boolGetter ? getPropertyName("is", ee) : setter ? getPropertyName("set", ee) : null;
                 if (propName != null) {
                     final TypeMirror propType;
                     if (getter || boolGetter) {
@@ -181,8 +164,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                             propType = element.asType();
                         } else if (parameters.size() == 2) {
                             var first = parameters.get(0);
-                            var isIndex = first.asType() instanceof PrimitiveType primitiveType
-                                    && "int".equals(primitiveType.toString());
+                            var isIndex = first.asType() instanceof PrimitiveType primitiveType && "int".equals(primitiveType.toString());
                             propType = isIndex ? parameters.get(1).asType() : null;
                         } else {
                             propType = null;
@@ -232,10 +214,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
     }
 
     private static String getStrType(TypeMirror type) {
-        return type instanceof TypeVariable typeVariable ? getStrType(typeVariable.getUpperBound())
-                : type instanceof IntersectionType intersectionType ? getStrType(intersectionType.getBounds().get(0))
-                : type instanceof ArrayType || type instanceof DeclaredType || type instanceof PrimitiveType ? type.toString()
-                : null;
+        return type instanceof TypeVariable typeVariable ? getStrType(typeVariable.getUpperBound()) : type instanceof IntersectionType intersectionType ? getStrType(intersectionType.getBounds().get(0)) : type instanceof ArrayType || type instanceof DeclaredType || type instanceof PrimitiveType ? type.toString() : null;
     }
 
     private TypeSpec newTypeSpec(Bean bean) {
@@ -259,9 +238,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             fieldsBuilder.addEnumConstant(property.getName(), enumConstructor(dotClass(getStrType(property.getType()))));
         }
 
-        var builder = classBuilder(bean.getOutput().getName())
-                .addMethod(constructorBuilder().addModifiers(PRIVATE).build())
-                .addModifiers(FINAL);
+        var builder = classBuilder(bean.getOutput().getName()).addMethod(constructorBuilder().addModifiers(PRIVATE).build()).addModifiers(FINAL);
 
         if (addTypes) {
             builder.addType(typesBuilder.build());
@@ -270,9 +247,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             builder.addType(fieldsBuilder.build());
         }
         var modifiers = bean.getModifiers();
-        var accessLevel = modifiers.contains(PRIVATE) ? PRIVATE
-                : modifiers.contains(PROTECTED) ? PROTECTED
-                : modifiers.contains(PUBLIC) ? PUBLIC : null;
+        var accessLevel = modifiers.contains(PRIVATE) ? PRIVATE : modifiers.contains(PROTECTED) ? PROTECTED : modifiers.contains(PUBLIC) ? PUBLIC : null;
         if (accessLevel != null) {
             builder.addModifiers(accessLevel);
         }
@@ -287,21 +262,13 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
     private Builder typesEnumBuilder(String enumName) {
         var typeType = classType();
         var typeName = "type";
-        return enumBuilder(enumName).addModifiers(PUBLIC)
-                .addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build())
-                .addMethod(constructorBuilder().addParameter(typeType, typeName).addCode(
-                        CodeBlock.builder().add("this." + typeName + " = " + typeName + ";").build()
-                ).build());
+        return enumBuilder(enumName).addModifiers(PUBLIC).addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build()).addMethod(constructorBuilder().addParameter(typeType, typeName).addCode(CodeBlock.builder().add("this." + typeName + " = " + typeName + ";").build()).build());
     }
 
     private Builder fieldsEnumBuilder(String enumName) {
         var typeType = classType();
         var typeName = "type";
-        return enumBuilder(enumName).addModifiers(PUBLIC)
-                .addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build())
-                .addMethod(constructorBuilder().addParameter(typeType, typeName).addCode(
-                        CodeBlock.builder().add("this." + typeName + " = " + typeName + ";").build()
-                ).build());
+        return enumBuilder(enumName).addModifiers(PUBLIC).addField(builder(typeType, typeName).addModifiers(PUBLIC, FINAL).build()).addMethod(constructorBuilder().addParameter(typeType, typeName).addCode(CodeBlock.builder().add("this." + typeName + " = " + typeName + ";").build()).build());
     }
 
 
@@ -309,9 +276,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
     @SneakyThrows
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         var elements = roundEnv.getElementsAnnotatedWith(Meta.class);
-        var beans = elements.stream().map(e -> e instanceof TypeElement type ? type : null)
-                .filter(Objects::nonNull).filter(type -> type.getEnclosingElement() instanceof PackageElement)
-                .map(MetaAnnotationProcessor::getBean).toList();
+        var beans = elements.stream().map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull).filter(type -> type.getEnclosingElement() instanceof PackageElement).map(MetaAnnotationProcessor::getBean).toList();
 
         for (var bean : beans) {
             var output = bean.getOutput();
@@ -319,8 +284,8 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             var javaFileObject = JavaFile.builder(bean.getOutput().getPackage(), newTypeSpec(bean)).build().toJavaFileObject();
 
             var builderFile = processingEnv.getFiler().createSourceFile(output.getPackage() + "." + output.getName());
-            try (var out = new PrintWriter(builderFile.openWriter())) {
-                var reader = javaFileObject.openReader(true);
+            try (var out = new PrintWriter(builderFile.openWriter());
+                 var reader = javaFileObject.openReader(true)) {
                 reader.transferTo(out);
             }
         }
