@@ -1,6 +1,7 @@
 package example;
 
 import example.model.UserEntity;
+import example.model.UserEntityMeta;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class UserEntityTest {
     @Test
     public void paramType() {
-        assertEquals(Long.class, Params.ID.type);
+        assertEquals(Long.class, UserEntityMeta.Params.ID.type);
     }
 
     @Test

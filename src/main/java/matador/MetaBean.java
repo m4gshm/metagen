@@ -6,19 +6,21 @@ import lombok.Data;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Data
 @Builder
-public class Bean {
+public class MetaBean {
+    private String ofClass;
     private String name;
+    private String package_;
     private Set<Modifier> modifiers;
     private List<Property> properties;
-    private List<Bean> types;
+    private Map<String, MetaBean> nestedTypes;
+    private Map<String, MetaBean.Interface> interfaces;
     private List<Param> typeParameters;
     private boolean isRecord;
-
-    private Output output;
     private Meta meta;
 
     @Data
@@ -31,26 +33,17 @@ public class Bean {
         private TypeMirror type;
     }
 
-
-    @Data
-    @Builder
-    public static final class Output {
-        private String name;
-        private String package_;
-
-        public String getPackage() {
-            return package_;
-        }
-
-        public void setPackage(String value) {
-            this.package_ = value;
-        }
-    }
-
     @Data
     @Builder
     public static final class Param {
         private String name;
         private TypeMirror type;
+    }
+
+    @Data
+    @Builder
+    public static class Interface {
+        private String name;
+        private List<Param> typeParameters;
     }
 }
