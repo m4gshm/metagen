@@ -1,5 +1,6 @@
 package example.model;
 
+import example.IdAware;
 import lombok.Data;
 import matador.Meta;
 

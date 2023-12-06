@@ -12,8 +12,8 @@ import java.util.Set;
 @Data
 @Builder
 public class MetaBean {
-    private String ofClass;
     private String name;
+    private String class_;
     private String package_;
     private Set<Modifier> modifiers;
     private List<Property> properties;

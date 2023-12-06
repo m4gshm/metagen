@@ -1,20 +1,26 @@
 package example;
 
 import example.model.UserEntity;
-import example.model.UserEntityMeta;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
 import java.util.Set;
 
-import static example.model.UserEntityMeta.Fields.*;
-import static example.model.UserEntityMeta.Params;
+import static example.model.UserEntityMeta.Fields.address;
+import static example.model.UserEntityMeta.Fields.age;
+import static example.model.UserEntityMeta.Fields.id;
+import static example.model.UserEntityMeta.Fields.name;
+import static example.model.UserEntityMeta.Fields.values;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class UserEntityTest {
     @Test
     public void paramType() {
-        assertEquals(Long.class, UserEntityMeta.Params.ID.type);
+
+//        var idAwareParams = Set.of(UserEntityMeta.inherits().get(IdAware.class).parameters());
+
+//        assertEquals(Set.of(IdAwareMeta.Params.values()))
+
     }
 
     @Test

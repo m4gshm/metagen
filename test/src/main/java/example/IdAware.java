@@ -1,4 +1,4 @@
-package example.model;
+package example;
 
 import matador.Meta;
 
