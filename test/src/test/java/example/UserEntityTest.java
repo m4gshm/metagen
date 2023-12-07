@@ -1,6 +1,10 @@
 package example;
 
+import example.model.Model;
 import example.model.UserEntity;
+import example.model.UserEntityMeta;
+import lombok.SneakyThrows;
+import matador.MetaModel;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
@@ -11,16 +15,26 @@ import static example.model.UserEntityMeta.Fields.age;
 import static example.model.UserEntityMeta.Fields.id;
 import static example.model.UserEntityMeta.Fields.name;
 import static example.model.UserEntityMeta.Fields.values;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class UserEntityTest {
     @Test
-    public void paramType() {
+    public void userEntityFieldsEnum() {
+        var metaModel = Model.instance.of(UserEntity.class);
+        assertEquals(UserEntityMeta.class, metaModel.getClass());
 
-//        var idAwareParams = Set.of(UserEntityMeta.inherits().get(IdAware.class).parameters());
+        assertArrayEquals(UserEntityMeta.Fields.values(), metaModel.fields());
+        assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
+    }
 
-//        assertEquals(Set.of(IdAwareMeta.Params.values()))
-
+    @Test
+    @SneakyThrows
+    public void noEntityClassInModel() {
+        var type = Class.forName("example.model.Entity");
+        var metaModel = Model.instance.of(type);
+        assertNull(metaModel);
     }
 
     @Test

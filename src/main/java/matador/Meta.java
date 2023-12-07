@@ -10,7 +10,10 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 @Target({TYPE, PACKAGE})
 @Retention(SOURCE)
 public @interface Meta {
-    String suffix() default "Meta";
+
+    String META = "Meta";
+
+    String suffix() default META;
 
     Fields fields() default @Fields();
 
