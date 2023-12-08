@@ -1,10 +1,6 @@
 package matador;
 
-import io.jbock.javapoet.ClassName;
-import io.jbock.javapoet.CodeBlock;
-import io.jbock.javapoet.JavaFile;
-import io.jbock.javapoet.ParameterSpec;
-import io.jbock.javapoet.ParameterizedTypeName;
+import io.jbock.javapoet.*;
 import lombok.SneakyThrows;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -16,20 +12,12 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.element.Modifier.*;
 import static matador.MetaAnnotationProcessorUtils.getAggregatorName;
 import static matador.MetaAnnotationProcessorUtils.newTypeSpec;
 
@@ -60,7 +48,10 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
 
             var typeSpec = newTypeSpec(bean);
             var inheritMetamodel = typeSpec.superinterfaces.stream()
-                    .anyMatch(s -> s.equals(ClassName.get(MetaModel.class)));
+                    .anyMatch(s -> {
+                        var expected = ClassName.get(MetaModel.class);
+                        return s instanceof ParameterizedTypeName p ? p.rawType.equals(expected) : s.equals(expected);
+                    });
 
             if (inheritMetamodel) {
                 var aggParts = aggregators.computeIfAbsent(beanPackage,

@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Set;
 @Data
 @Builder
 public class MetaBean {
+    private TypeElement type;
     private String name;
     private String class_;
     private String package_;

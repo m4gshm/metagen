@@ -1,8 +1,9 @@
 package matador;
 
-public interface MetaModel {
-    TypeAware[] parameters();
+public interface MetaModel<T> extends ParametersAware {
 
-    TypeAware[] fields();
+    Class<T> type();
+
+    Typed[] fields();
 
 }
