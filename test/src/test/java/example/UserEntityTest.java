@@ -4,20 +4,13 @@ import example.model.Model;
 import example.model.UserEntity;
 import example.model.UserEntityMeta;
 import lombok.SneakyThrows;
-import matador.MetaModel;
 import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
 import java.util.Set;
 
-import static example.model.UserEntityMeta.Fields.address;
-import static example.model.UserEntityMeta.Fields.age;
-import static example.model.UserEntityMeta.Fields.id;
-import static example.model.UserEntityMeta.Fields.name;
-import static example.model.UserEntityMeta.Fields.values;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static example.model.UserEntityMeta.Props.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class UserEntityTest {
     @Test
@@ -25,7 +18,7 @@ public class UserEntityTest {
         var metaModel = Model.instance.of(UserEntity.class);
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
-        assertArrayEquals(UserEntityMeta.Fields.values(), metaModel.fields());
+        assertArrayEquals(UserEntityMeta.Props.values(), metaModel.fields());
         assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
     }
 
@@ -40,7 +33,7 @@ public class UserEntityTest {
     @Test
     public void fieldType() {
         assertEquals(Integer.class, age.type);
-        assertEquals(Serializable.class, id.type);
+        assertEquals(Long.class, id.type);
         assertEquals(UserEntity.Address.class, address.type);
     }
 

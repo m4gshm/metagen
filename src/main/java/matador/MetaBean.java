@@ -5,25 +5,35 @@ import lombok.Data;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
+import static matador.MetaAnnotationProcessorUtils.getPackage;
+
 @Data
-@Builder
+@Builder(toBuilder = true)
 public class MetaBean {
     private TypeElement type;
     private String name;
-    private String class_;
-    private String package_;
     private Set<Modifier> modifiers;
     private List<Property> properties;
-    private Map<String, MetaBean> nestedTypes;
-    private Map<String, MetaBean.Interface> interfaces;
     private List<Param> typeParameters;
+    private MetaBean superclass;
+    private List<MetaBean> nestedTypes;
+    private List<MetaBean> interfaces;
     private boolean isRecord;
     private Meta meta;
+
+    public String getClassName() {
+        return type.getSimpleName().toString();
+    }
+
+    public String getPackageName() {
+        var packageElement = getPackage(type);
+        return packageElement != null ? packageElement.getQualifiedName().toString() : null;
+    }
 
     @Data
     @Builder
@@ -38,14 +48,14 @@ public class MetaBean {
     @Data
     @Builder
     public static final class Param {
-        private String name;
+        private TypeParameterElement name;
         private TypeMirror type;
     }
 
     @Data
     @Builder
     public static class Interface {
-        private String name;
+        private TypeElement type;
         private List<Param> typeParameters;
     }
 }

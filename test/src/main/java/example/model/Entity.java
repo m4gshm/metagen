@@ -7,7 +7,7 @@ import matador.Meta;
 import java.io.Serializable;
 
 @Data
-@Meta(fields = @Meta.Fields(enumerate = false))
+@Meta(properties = @Meta.Properties(enumerate = false))
 abstract class Entity<ID extends Serializable & Comparable<ID>> implements IdAware<ID> {
     public ID id;
 }

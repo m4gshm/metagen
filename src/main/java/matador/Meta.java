@@ -15,17 +15,17 @@ public @interface Meta {
 
     String suffix() default META;
 
-    Fields fields() default @Fields();
+    Properties properties() default @Properties();
 
     Parameters params() default @Parameters();
 
     boolean aggregate() default true;
 
     @Retention(SOURCE)
-    @interface Fields {
+    @interface Properties {
         boolean enumerate() default true;
 
-        String className() default "Fields";
+        String className() default "Props";
     }
 
     @Retention(SOURCE)

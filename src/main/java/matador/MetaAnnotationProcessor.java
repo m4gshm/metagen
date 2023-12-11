@@ -18,8 +18,7 @@ import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
 import static javax.lang.model.element.Modifier.*;
-import static matador.MetaAnnotationProcessorUtils.getAggregatorName;
-import static matador.MetaAnnotationProcessorUtils.newTypeSpec;
+import static matador.MetaAnnotationProcessorUtils.*;
 
 @SupportedAnnotationTypes("matador.Meta")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
@@ -35,7 +34,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         var beans = elements.stream()
                 .map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull)
                 .filter(type -> type.getEnclosingElement() instanceof PackageElement)
-                .map(type -> MetaAnnotationProcessorUtils.getBean(type, processingEnv.getMessager())).toList();
+                .map(type -> getBean(type, null, processingEnv.getMessager())).toList();
 
         record AggregatorParts(String package_, String name, List<String> mapParts) {
 
@@ -43,7 +42,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
 
         var aggregators = new HashMap<String, AggregatorParts>();
         for (var bean : beans) {
-            var beanPackage = bean.getPackage_();
+            var beanPackage = bean.getPackageName();
             var name = bean.getName();
 
             var typeSpec = newTypeSpec(bean);
@@ -61,7 +60,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                 if (mapParts.size() > 1) {
                     mapParts.add(",\n");
                 }
-                mapParts.add(bean.getClass_() + ".class, new " + name + "()");
+                mapParts.add(bean.getClassName() + ".class, new " + name + "()");
             }
 
             var javaFileObject = JavaFile.builder(beanPackage, typeSpec).build().toJavaFileObject();
