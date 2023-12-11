@@ -26,6 +26,7 @@ public @interface Meta {
         boolean enumerate() default true;
 
         String className() default "Props";
+        String methodName() default "properties";
     }
 
     @Retention(SOURCE)
@@ -33,6 +34,19 @@ public @interface Meta {
         boolean enumerate() default true;
 
         String className() default "Params";
+
+        String methodName() default "parameters";
+
+        Super inherited() default @Super();
+
+        @Retention(SOURCE)
+        @interface Super {
+            boolean enumerate() default true;
+
+            String className() default "SuperParams";
+
+            String methodName() default "superParameters";
+        }
     }
 
 }

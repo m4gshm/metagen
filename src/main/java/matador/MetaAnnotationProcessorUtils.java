@@ -121,29 +121,20 @@ public class MetaAnnotationProcessorUtils {
                 ? typeParameters.stream().collect(toMap(p -> p.getName().asType(), p -> p.getType()))
                 : Map.<TypeMirror, TypeMirror>of();
         var type = collect.get(typeVariable);
-        if (type != null  && !type.equals(typeVariable)) {
+        if (type != null && !type.equals(typeVariable)) {
             return getStrType(type, typeParameters);
         } else {
             return getStrType(typeVariable.getUpperBound(), typeParameters);
         }
     }
 
-//    static MetaBean getParentBean(Map<String, MetaBean> nestedTypes, String typeName) {
-//        var parentBean = nestedTypes.get(typeName);
-//        if (parentBean == null) {
-//            parentBean = MetaBean.builder().class_(typeName).isRecord(false).build();
-//            nestedTypes.put(typeName, parentBean);
-//        }
-//        return parentBean;
-//    }
-
-    static void populateTypeParameters(TypeSpec.Builder builder, String enumName, List<MetaBean.Param> typeParameters) {
+    private static TypeSpec newEnumParams(String enumName, List<MetaBean.Param> typeParameters) {
         var typesBuilder = typesEnumBuilder(enumName);
         for (var param : typeParameters) {
             var name = param.getName().getSimpleName().toString();
             typesBuilder.addEnumConstant(name, enumConstructor(dotClass(getStrType(param.getType(), typeParameters))));
         }
-        builder.addType(typesBuilder.build());
+        return typesBuilder.build();
     }
 
     static TypeSpec.Builder fieldsEnumBuilder(String enumName) {
@@ -183,7 +174,6 @@ public class MetaAnnotationProcessorUtils {
         }
         var isRecord = type.getRecordComponents() != null;
         var meta = type.getAnnotation(Meta.class);
-
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
         var nestedTypes = new LinkedHashMap<String, MetaBean>();
@@ -240,11 +230,11 @@ public class MetaAnnotationProcessorUtils {
                 property.setField(true);
                 updateType(property, propType);
             } else if (enclosedElement instanceof TypeElement te && enclosedElement.getAnnotation(Meta.class) != null) {
-                var bean1 = getBean(te, null, messager);
-                var nestedBeanClassName = bean1.getClassName();
+                var nestedBean = getBean(te, null, messager);
+                var nestedBeanClassName = nestedBean.getClassName();
                 var exists = nestedTypes.get(nestedBeanClassName);
                 if (exists == null) {
-                    nestedTypes.put(nestedBeanClassName, bean1);
+                    nestedTypes.put(nestedBeanClassName, nestedBean);
                 } else {
                     //todo
 //                    var parentBeanTypes = getParentBean(nestedTypes, typeName).getNestedTypes();
@@ -299,7 +289,6 @@ public class MetaAnnotationProcessorUtils {
 
     static MethodSpec enumValuesMethod(String name, ClassName typeClassName, boolean overr) {
         var builder = methodBuilder(name)
-
                 .addModifiers(PUBLIC)
                 .returns(ArrayTypeName.of(typeClassName))
                 .addCode(
@@ -313,18 +302,18 @@ public class MetaAnnotationProcessorUtils {
         return builder.build();
     }
 
-    private static TypeSpec newTypeSpec(String interfaceName, String enumName, MetaBean interfaceMeta) {
+    private static TypeSpec newTypeInterface(String interfaceName, String enumName, MetaBean interfaceMeta) {
         var builder = classBuilder(interfaceName);
-        populateTypeParameters(builder, enumName, interfaceMeta.getTypeParameters());
+        builder.addType(newEnumParams(enumName, interfaceMeta.getTypeParameters()));
         return builder.build();
     }
 
-    static TypeSpec newTypeSpec(MetaBean bean) {
+    static TypeSpec newTypeBean(MetaBean bean) {
         var meta = ofNullable(bean.getMeta());
-        var fields = meta.map(Meta::properties);
+        var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
 
-        var addFieldsEnum = fields.map(Meta.Properties::enumerate).orElse(false);
+        var addFieldsEnum = props.map(Meta.Properties::enumerate).orElse(false);
         var addParamsEnum = parameters.map(Meta.Parameters::enumerate).orElse(false);
         var inheritMetamodel = addFieldsEnum && addParamsEnum;
 
@@ -354,25 +343,36 @@ public class MetaAnnotationProcessorUtils {
 
 
         if (inheritMetamodel) {
-            builder.addSuperinterface(
-                    ParameterizedTypeName.get(
-                            ClassName.get(MetaModel.class),
-                            className)
-            );
+            builder.addSuperinterface(ParameterizedTypeName.get(
+                    ClassName.get(MetaModel.class), className
+            ));
         }
 
-        var typeParameters = bean.getTypeParameters();
-        if (addParamsEnum) {
-            var typeName = meta.get().params().className();
-            populateTypeParameters(builder, typeName, typeParameters);
 
+        var nestedTypeNames = new HashSet<String>();
+
+        if (addParamsEnum) {
+            var params = parameters.get();
+            var typeName = getUniqueNestedTypeName(params.className(), nestedTypeNames);
+            builder.addType(newEnumParams(typeName, bean.getTypeParameters()));
             builder.addMethod(
-                    enumValuesMethod("parameters", ClassName.get("", typeName), inheritMetamodel)
+                    enumValuesMethod(params.methodName(), ClassName.get("", typeName), inheritMetamodel)
             );
+
+            var superclass = bean.getSuperclass();
+            var inherited = params.inherited();
+            if (superclass != null && inherited != null && inherited.enumerate()) {
+                var superTypeName = getUniqueNestedTypeName(inherited.className(), nestedTypeNames);
+                builder.addType(newEnumParams(superTypeName, superclass.getTypeParameters()));
+                builder.addMethod(
+                        enumValuesMethod(inherited.methodName(), ClassName.get("", superTypeName), false)
+                );
+            }
         }
 
         if (addFieldsEnum) {
-            var typeName = fields.get().className();
+            var propsInfo = props.get();
+            var typeName = getUniqueNestedTypeName(propsInfo.className(), nestedTypeNames);
             var fieldsBuilder = fieldsEnumBuilder(typeName);
             var propertyNames = new HashSet<String>();
             var properties = bean.getProperties();
@@ -397,7 +397,7 @@ public class MetaAnnotationProcessorUtils {
 
             builder.addType(fieldsBuilder.build());
             builder.addMethod(
-                    enumValuesMethod("fields", ClassName.get("", typeName), inheritMetamodel)
+                    enumValuesMethod(propsInfo.methodName(), ClassName.get("", typeName), inheritMetamodel)
             );
         }
         var modifiers = ofNullable(bean.getModifiers()).orElse(Set.of());
@@ -408,28 +408,33 @@ public class MetaAnnotationProcessorUtils {
             builder.addModifiers(accessLevel);
         }
 
-        var nestedTypeNames = new HashSet<String>();
         var nestedTypes = ofNullable(bean.getNestedTypes()).orElse(List.of());
         for (var nestedBean : nestedTypes) {
-            var nestedName = nestedBean.getClassName();
-            if (!nestedTypeNames.add(nestedName)) {
-                throw new IllegalStateException("Unexpectedly nested type has been already handled, " + nestedName);
+            var beanClassName = nestedBean.getClassName();
+            var nestedName = getUniqueNestedTypeName(beanClassName, nestedTypeNames);
+            if (!beanClassName.equals(nestedName)) {
+                nestedBean = nestedBean.toBuilder().className(nestedName).build();
             }
-            builder.addType(newTypeSpec(nestedBean));
+            builder.addType(newTypeBean(nestedBean));
         }
 
         if (addParamsEnum) {
             var interfaces = bean.getInterfaces();
             if (interfaces != null) interfaces.forEach((interfaceMeta) -> {
-                var interfaceName = interfaceMeta.getClassName();
-                while (nestedTypeNames.contains(interfaceName)) {
-                    interfaceName = "_" + interfaceName;
-                }
-                builder.addType(newTypeSpec(interfaceName, meta.get().params().className(), interfaceMeta));
+                var interfaceName = getUniqueNestedTypeName(interfaceMeta.getClassName(), nestedTypeNames);
+                builder.addType(newTypeInterface(interfaceName, meta.get().params().className(), interfaceMeta));
             });
         }
 
         return builder.build();
+    }
+
+    private static String getUniqueNestedTypeName(String name, Collection<String> nestedTypeNames) {
+        while (nestedTypeNames.contains(name)) {
+            name = "_" + name;
+        }
+        nestedTypeNames.add(name);
+        return name;
     }
 
     private static void getAddEnumConstant(Builder fieldsBuilder, List<MetaBean.Param> typeParameters,

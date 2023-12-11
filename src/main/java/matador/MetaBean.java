@@ -17,6 +17,7 @@ import static matador.MetaAnnotationProcessorUtils.getPackage;
 public class MetaBean {
     private TypeElement type;
     private String name;
+    private String className;
     private Set<Modifier> modifiers;
     private List<Property> properties;
     private List<Param> typeParameters;
@@ -27,7 +28,7 @@ public class MetaBean {
     private Meta meta;
 
     public String getClassName() {
-        return type.getSimpleName().toString();
+        return className != null ? className : type.getSimpleName().toString();
     }
 
     public String getPackageName() {

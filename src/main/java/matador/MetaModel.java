@@ -4,6 +4,6 @@ public interface MetaModel<T> extends ParametersAware {
 
     Class<T> type();
 
-    Typed[] fields();
+    Typed[] properties();
 
 }

@@ -45,7 +45,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             var beanPackage = bean.getPackageName();
             var name = bean.getName();
 
-            var typeSpec = newTypeSpec(bean);
+            var typeSpec = newTypeBean(bean);
             var inheritMetamodel = typeSpec.superinterfaces.stream()
                     .anyMatch(s -> {
                         var expected = ClassName.get(MetaModel.class);

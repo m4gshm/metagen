@@ -6,7 +6,6 @@ import example.model.UserEntityMeta;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 
-import java.io.Serializable;
 import java.util.Set;
 
 import static example.model.UserEntityMeta.Props.*;
@@ -18,7 +17,7 @@ public class UserEntityTest {
         var metaModel = Model.instance.of(UserEntity.class);
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
-        assertArrayEquals(UserEntityMeta.Props.values(), metaModel.fields());
+        assertArrayEquals(UserEntityMeta.Props.values(), metaModel.properties());
         assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
     }
 
