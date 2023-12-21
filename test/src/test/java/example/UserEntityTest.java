@@ -19,6 +19,7 @@ public class UserEntityTest {
 
         assertArrayEquals(UserEntityMeta.Props.values(), metaModel.properties());
         assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
+        assertArrayEquals(UserEntityMeta.SuperParams.values(), metaModel.superParameters());
     }
 
     @Test

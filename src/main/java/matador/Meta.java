@@ -23,29 +23,41 @@ public @interface Meta {
 
     @Retention(SOURCE)
     @interface Properties {
+
+        String METHOD_NAME = "properties";
+        String CLASS_NAME = "Props";
+
         boolean enumerate() default true;
 
-        String className() default "Props";
-        String methodName() default "properties";
+        String className() default CLASS_NAME;
+        String methodName() default METHOD_NAME;
     }
 
     @Retention(SOURCE)
     @interface Parameters {
+
+        String METHOD_NAME = "parameters";
+        String CLASS_NAME = "Params";
+
         boolean enumerate() default true;
 
-        String className() default "Params";
+        String className() default CLASS_NAME;
 
-        String methodName() default "parameters";
+        String methodName() default METHOD_NAME;
 
         Super inherited() default @Super();
 
         @Retention(SOURCE)
         @interface Super {
+
+            String METHOD_NAME = "superParameters";
+            String CLASS_NAME = "SuperParams";
+
             boolean enumerate() default true;
 
-            String className() default "SuperParams";
+            String className() default CLASS_NAME;
 
-            String methodName() default "superParameters";
+            String methodName() default METHOD_NAME;
         }
     }
 

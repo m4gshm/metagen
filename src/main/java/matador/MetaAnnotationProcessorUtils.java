@@ -315,7 +315,7 @@ public class MetaAnnotationProcessorUtils {
 
         var addFieldsEnum = props.map(Meta.Properties::enumerate).orElse(false);
         var addParamsEnum = parameters.map(Meta.Parameters::enumerate).orElse(false);
-        var inheritMetamodel = addFieldsEnum && addParamsEnum;
+
 
         var className = ClassName.get(bean.getType());
 
@@ -328,9 +328,6 @@ public class MetaAnnotationProcessorUtils {
                         .addStatement("return type")
                         .build());
 
-        if (inheritMetamodel) {
-            typeGetter.addAnnotation(Override.class);
-        }
         var typeField = builder(
                 typeFieldType, "type", PUBLIC, FINAL)
                 .initializer(CodeBlock.builder().addStatement("$T.class", className).build())
@@ -338,40 +335,40 @@ public class MetaAnnotationProcessorUtils {
 
         var builder = classBuilder(name)
                 .addMethod(constructorBuilder().build())
-                .addField(typeField).addMethod(typeGetter.build())
+                .addField(typeField)
                 .addModifiers(FINAL);
-
-
-        if (inheritMetamodel) {
-            builder.addSuperinterface(ParameterizedTypeName.get(
-                    ClassName.get(MetaModel.class), className
-            ));
-        }
-
 
         var nestedTypeNames = new HashSet<String>();
 
+        var inheritParams = false;
+        var inheritSuperParams = false;
         if (addParamsEnum) {
             var params = parameters.get();
             var typeName = getUniqueNestedTypeName(params.className(), nestedTypeNames);
+            var methodName = params.methodName();
+            inheritParams = Meta.Parameters.METHOD_NAME.equals(methodName);
+
             builder.addType(newEnumParams(typeName, bean.getTypeParameters()));
             builder.addMethod(
-                    enumValuesMethod(params.methodName(), ClassName.get("", typeName), inheritMetamodel)
+                    enumValuesMethod(methodName, ClassName.get("", typeName), inheritParams)
             );
 
             var superclass = bean.getSuperclass();
             var inherited = params.inherited();
             if (superclass != null && inherited != null && inherited.enumerate()) {
+                inheritSuperParams = Meta.Parameters.Super.METHOD_NAME.equals(inherited.methodName());
                 var superTypeName = getUniqueNestedTypeName(inherited.className(), nestedTypeNames);
                 builder.addType(newEnumParams(superTypeName, superclass.getTypeParameters()));
                 builder.addMethod(
-                        enumValuesMethod(inherited.methodName(), ClassName.get("", superTypeName), false)
+                        enumValuesMethod(inherited.methodName(), ClassName.get("", superTypeName), inheritSuperParams)
                 );
             }
         }
 
+        var inheritProps = false;
         if (addFieldsEnum) {
             var propsInfo = props.get();
+            inheritProps = Meta.Properties.METHOD_NAME.equals(propsInfo.methodName());
             var typeName = getUniqueNestedTypeName(propsInfo.className(), nestedTypeNames);
             var fieldsBuilder = fieldsEnumBuilder(typeName);
             var propertyNames = new HashSet<String>();
@@ -397,9 +394,32 @@ public class MetaAnnotationProcessorUtils {
 
             builder.addType(fieldsBuilder.build());
             builder.addMethod(
-                    enumValuesMethod(propsInfo.methodName(), ClassName.get("", typeName), inheritMetamodel)
+                    enumValuesMethod(propsInfo.methodName(), ClassName.get("", typeName), inheritProps)
             );
         }
+
+        var inheritMetamodel = inheritParams && inheritProps && inheritSuperParams;
+        if (inheritMetamodel) {
+            typeGetter.addAnnotation(Override.class);
+        }
+        builder.addMethod(typeGetter.build());
+
+        if (inheritMetamodel) {
+            builder.addSuperinterface(ParameterizedTypeName.get(
+                    ClassName.get(MetaModel.class), className
+            ));
+        } else {
+            if (inheritParams) {
+                builder.addSuperinterface(ClassName.get(ParametersAware.class));
+            }
+            if (inheritSuperParams) {
+                builder.addSuperinterface(ClassName.get(SuperParametersAware.class));
+            }
+            if (inheritProps) {
+                builder.addSuperinterface(ClassName.get(PropertiesAware.class));
+            }
+        }
+
         var modifiers = ofNullable(bean.getModifiers()).orElse(Set.of());
         var accessLevel = modifiers.contains(PRIVATE) ? PRIVATE
                 : modifiers.contains(PROTECTED) ? PROTECTED
