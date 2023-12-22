@@ -30,6 +30,7 @@ public @interface Meta {
         boolean enumerate() default true;
 
         String className() default CLASS_NAME;
+
         String methodName() default METHOD_NAME;
     }
 
@@ -45,19 +46,40 @@ public @interface Meta {
 
         String methodName() default METHOD_NAME;
 
-        Super inherited() default @Super();
+        Inherited inherited() default @Inherited;
 
         @Retention(SOURCE)
-        @interface Super {
+        @interface Inherited {
 
-            String METHOD_NAME = "superParameters";
-            String CLASS_NAME = "SuperParams";
+            Super parentClass() default @Super;
 
-            boolean enumerate() default true;
+            Interfaces interfaces() default @Interfaces;
 
-            String className() default CLASS_NAME;
+            @Retention(SOURCE)
+            @interface Super {
 
-            String methodName() default METHOD_NAME;
+                String METHOD_NAME = "superParameters";
+                String CLASS_NAME_SUFFIX = "Params";
+
+                boolean enumerate() default true;
+
+                String classNameSuffix() default CLASS_NAME_SUFFIX;
+
+                String methodName() default METHOD_NAME;
+            }
+
+            @Retention(SOURCE)
+            @interface Interfaces {
+
+                String METHOD_NAME = "parametersOf";
+                String CLASS_NAME_SUFFIX = "Params";
+
+                boolean enumerate() default true;
+
+                String classNameSuffix() default CLASS_NAME_SUFFIX;
+
+                String methodName() default METHOD_NAME;
+            }
         }
     }
 

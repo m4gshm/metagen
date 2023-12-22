@@ -4,14 +4,10 @@ import io.jbock.javapoet.*;
 import lombok.experimental.UtilityClass;
 
 import javax.annotation.processing.Messager;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.util.*;
 
-import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.*;
@@ -150,7 +146,7 @@ public class MetaAnnotationProcessorUtils {
         return enumBuilder(enumName)
                 .addSuperinterface(Typed.class)
                 .addModifiers(PUBLIC)
-                .addField(builder(typeType, "type").addModifiers(PUBLIC, FINAL).build())
+                .addField(FieldSpec.builder(typeType, "type").addModifiers(PUBLIC, FINAL).build())
                 .addMethod(
                         methodBuilder("type")
                                 .addAnnotation(Override.class)
@@ -288,18 +284,21 @@ public class MetaAnnotationProcessorUtils {
     }
 
     static MethodSpec enumValuesMethod(String name, ClassName typeClassName, boolean overr) {
+        var code = CodeBlock.builder()
+                .addStatement("return $T.values()", typeClassName)
+                .build();
+        return enumValuesMethodBuilder(name, typeClassName, overr, code).build();
+    }
+
+    static MethodSpec.Builder enumValuesMethodBuilder(String name, TypeName typeClassName, boolean overr, CodeBlock codeBlock) {
         var builder = methodBuilder(name)
                 .addModifiers(PUBLIC)
                 .returns(ArrayTypeName.of(typeClassName))
-                .addCode(
-                        CodeBlock.builder()
-                                .addStatement("return $T.values()", typeClassName)
-                                .build()
-                );
+                .addCode(codeBlock);
         if (overr) {
             builder.addAnnotation(Override.class);
         }
-        return builder.build();
+        return builder;
     }
 
     private static TypeSpec newTypeInterface(String interfaceName, String enumName, MetaBean interfaceMeta) {
@@ -308,14 +307,13 @@ public class MetaAnnotationProcessorUtils {
         return builder.build();
     }
 
-    static TypeSpec newTypeBean(MetaBean bean) {
+    static TypeSpec newTypeBean(MetaBean bean, Modifier... modifiers) {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
 
         var addFieldsEnum = props.map(Meta.Properties::enumerate).orElse(false);
         var addParamsEnum = parameters.map(Meta.Parameters::enumerate).orElse(false);
-
 
         var className = ClassName.get(bean.getType());
 
@@ -328,20 +326,29 @@ public class MetaAnnotationProcessorUtils {
                         .addStatement("return type")
                         .build());
 
-        var typeField = builder(
-                typeFieldType, "type", PUBLIC, FINAL)
+        var typeField = FieldSpec.builder(
+                        typeFieldType, "type", PUBLIC, FINAL)
                 .initializer(CodeBlock.builder().addStatement("$T.class", className).build())
                 .build();
 
+        var instanceField = FieldSpec.builder(
+                ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
+        ).initializer(CodeBlock.of("new $L()", name)).build();
+
         var builder = classBuilder(name)
                 .addMethod(constructorBuilder().build())
+                .addField(instanceField)
                 .addField(typeField)
+                .addModifiers(modifiers)
                 .addModifiers(FINAL);
 
         var nestedTypeNames = new HashSet<String>();
 
         var inheritParams = false;
         var inheritSuperParams = false;
+        var inheritParamsOf = false;
+        var superclass = bean.getSuperclass();
+        var interfaces = bean.getInterfaces();
         if (addParamsEnum) {
             var params = parameters.get();
             var typeName = getUniqueNestedTypeName(params.className(), nestedTypeNames);
@@ -353,15 +360,54 @@ public class MetaAnnotationProcessorUtils {
                     enumValuesMethod(methodName, ClassName.get("", typeName), inheritParams)
             );
 
-            var superclass = bean.getSuperclass();
+            var fieldName = "inheritedParams";
+            var inheritedParamsField = FieldSpec.builder(
+                    ParameterizedTypeName.get(Map.class, Class.class, Typed[].class), fieldName, PUBLIC, FINAL
+            );
+            var inheritedParamsFieldInitializer = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
+
             var inherited = params.inherited();
-            if (superclass != null && inherited != null && inherited.enumerate()) {
-                inheritSuperParams = Meta.Parameters.Super.METHOD_NAME.equals(inherited.methodName());
-                var superTypeName = getUniqueNestedTypeName(inherited.className(), nestedTypeNames);
+            var parentClass = inherited != null ? inherited.parentClass() : null;
+            var addSuperParams = superclass != null && parentClass != null && parentClass.enumerate();
+            if (addSuperParams) {
+                inheritSuperParams = Meta.Parameters.Inherited.Super.METHOD_NAME.equals(parentClass.methodName());
+                var superTypeName = getUniqueNestedTypeName(
+                        superclass.getClassName() + parentClass.classNameSuffix(), nestedTypeNames
+                );
                 builder.addType(newEnumParams(superTypeName, superclass.getTypeParameters()));
                 builder.addMethod(
-                        enumValuesMethod(inherited.methodName(), ClassName.get("", superTypeName), inheritSuperParams)
+                        enumValuesMethod(parentClass.methodName(), ClassName.get("", superTypeName), inheritSuperParams)
                 );
+                addInheritedParams(
+                        inheritedParamsFieldInitializer,
+                        ClassName.get(Meta.Parameters.Inherited.Super.class),
+                        superTypeName, false
+                );
+                addInheritedParams(
+                        inheritedParamsFieldInitializer,
+                        ClassName.get(superclass.getPackageName(), superclass.getClassName()),
+                        superTypeName, true
+                );
+            }
+            var interfacesParams = inherited != null ? inherited.interfaces() : null;
+            if (interfacesParams != null && interfaces != null && interfacesParams.enumerate()) {
+                inheritParamsOf = Meta.Parameters.Inherited.Interfaces.METHOD_NAME.equals(interfacesParams.methodName());
+                for (int i = 0; i < interfaces.size(); i++) {
+                    var iface = interfaces.get(i);
+                    var ifaceParametersEnumName = getUniqueNestedTypeName(
+                            iface.getClassName() + interfacesParams.classNameSuffix(), nestedTypeNames
+                    );
+                    builder.addType(newEnumParams(ifaceParametersEnumName, iface.getTypeParameters()));
+                    addInheritedParams(inheritedParamsFieldInitializer, ClassName.get(iface.getPackageName(), iface.getClassName()), ifaceParametersEnumName, addSuperParams || i > 0);
+                }
+                inheritedParamsField.initializer(inheritedParamsFieldInitializer.add("\n)").build());
+                builder.addField(inheritedParamsField.build());
+                var code = CodeBlock.builder()
+                        .addStatement("return $L.get(type)", fieldName)
+                        .build();
+                builder.addMethod(enumValuesMethodBuilder(interfacesParams.methodName(),
+                        ClassName.get(Typed.class), inheritParamsOf, code
+                ).addParameter(ParameterSpec.builder(Class.class, "type").build()).build());
             }
         }
 
@@ -381,7 +427,6 @@ public class MetaAnnotationProcessorUtils {
                 getAddEnumConstant(fieldsBuilder, bean.getTypeParameters(), propertyName, property.getType());
             }
 
-            var superclass = bean.getSuperclass();
             if (superclass != null) {
                 var superProperties = superclass.getProperties();
                 for (var property : superProperties) {
@@ -398,7 +443,7 @@ public class MetaAnnotationProcessorUtils {
             );
         }
 
-        var inheritMetamodel = inheritParams && inheritProps && inheritSuperParams;
+        var inheritMetamodel = inheritParams && inheritParamsOf && inheritProps;
         if (inheritMetamodel) {
             typeGetter.addAnnotation(Override.class);
         }
@@ -409,21 +454,21 @@ public class MetaAnnotationProcessorUtils {
                     ClassName.get(MetaModel.class), className
             ));
         } else {
-            if (inheritParams) {
+            if (inheritParams && inheritParamsOf) {
                 builder.addSuperinterface(ClassName.get(ParametersAware.class));
-            }
-            if (inheritSuperParams) {
-                builder.addSuperinterface(ClassName.get(SuperParametersAware.class));
             }
             if (inheritProps) {
                 builder.addSuperinterface(ClassName.get(PropertiesAware.class));
             }
         }
+        if (inheritSuperParams) {
+            builder.addSuperinterface(ClassName.get(SuperParametersAware.class));
+        }
 
-        var modifiers = ofNullable(bean.getModifiers()).orElse(Set.of());
-        var accessLevel = modifiers.contains(PRIVATE) ? PRIVATE
-                : modifiers.contains(PROTECTED) ? PROTECTED
-                : modifiers.contains(PUBLIC) ? PUBLIC : null;
+        var srcModifiers = ofNullable(bean.getModifiers()).orElse(Set.of());
+        var accessLevel = srcModifiers.contains(PRIVATE) ? PRIVATE
+                : srcModifiers.contains(PROTECTED) ? PROTECTED
+                : srcModifiers.contains(PUBLIC) ? PUBLIC : null;
         if (accessLevel != null) {
             builder.addModifiers(accessLevel);
         }
@@ -435,18 +480,31 @@ public class MetaAnnotationProcessorUtils {
             if (!beanClassName.equals(nestedName)) {
                 nestedBean = nestedBean.toBuilder().className(nestedName).build();
             }
-            builder.addType(newTypeBean(nestedBean));
+            builder.addType(newTypeBean(nestedBean, STATIC));
         }
 
-        if (addParamsEnum) {
-            var interfaces = bean.getInterfaces();
-            if (interfaces != null) interfaces.forEach((interfaceMeta) -> {
-                var interfaceName = getUniqueNestedTypeName(interfaceMeta.getClassName(), nestedTypeNames);
-                builder.addType(newTypeInterface(interfaceName, meta.get().params().className(), interfaceMeta));
-            });
-        }
+//        if (addParamsEnum) {
+//            if (interfaces != null) interfaces.forEach((interfaceMeta) -> {
+//                var interfaceName = getUniqueNestedTypeName(interfaceMeta.getClassName(), nestedTypeNames);
+//                builder.addType(newTypeInterface(interfaceName, meta.get().params().className(), interfaceMeta));
+//            });
+//        }
 
         return builder.build();
+    }
+
+    private static void addInheritedParams(CodeBlock.Builder inheritedParamsFieldInitializer,
+                                           ClassName className, String paramsEnumName, boolean addComma) {
+        inheritedParamsFieldInitializer.indent();
+        if (addComma) {
+            inheritedParamsFieldInitializer.add(",\n");
+        }
+        inheritedParamsFieldInitializer.add(
+                "$T.entry($L.class, $L.values())",
+                Map.class,
+                className,
+                paramsEnumName
+        ).unindent();
     }
 
     private static String getUniqueNestedTypeName(String name, Collection<String> nestedTypeNames) {

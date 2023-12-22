@@ -4,6 +4,8 @@ import example.model.Model;
 import example.model.UserEntity;
 import example.model.UserEntityMeta;
 import lombok.SneakyThrows;
+import matador.Meta;
+import matador.SuperParametersAware;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -19,7 +21,8 @@ public class UserEntityTest {
 
         assertArrayEquals(UserEntityMeta.Props.values(), metaModel.properties());
         assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
-        assertArrayEquals(UserEntityMeta.SuperParams.values(), metaModel.superParameters());
+        assertArrayEquals(UserEntityMeta.EntityParams.values(), metaModel.parametersOf(Meta.Parameters.Inherited.Super.class));
+        assertArrayEquals(UserEntityMeta.EntityParams.values(), ((SuperParametersAware)metaModel).superParameters());
     }
 
     @Test
