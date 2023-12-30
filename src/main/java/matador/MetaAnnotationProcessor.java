@@ -60,7 +60,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                 if (mapParts.size() > 1) {
                     mapParts.add(",\n");
                 }
-                mapParts.add(bean.getClassName() + ".class, new " + name + "()");
+                mapParts.add(mapEntry(bean.getClassName() + ".class", "new " + name + "()").toString());
             }
 
             var javaFileObject = JavaFile.builder(beanPackage, typeSpec).build().toJavaFileObject();
@@ -68,7 +68,16 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         }
 
         aggregators.forEach((pack, parts) -> {
-            var init = "Map.of(\n" + INDENT + parts.mapParts.stream().reduce("", (l, r) -> l + r) + UNINDENT + "\n)";
+            var mapParts = parts.mapParts();
+            var init = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
+            for (int i = 0; i < mapParts.size(); i++) {
+                var mapPart = mapParts.get(i);
+                if (i > 0) {
+                    init.add(",\n");
+                }
+                init.add(mapPart);
+            }
+            init.add("\n)");
             var typeName = parts.name;
             var typeSpec = classBuilder(typeName)
                     .addModifiers(PUBLIC, FINAL)
@@ -86,7 +95,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                                     ParameterizedTypeName.get(Map.class, Class.class, MetaModel.class),
                                     "metas", PRIVATE, FINAL
                             )
-                                    .initializer(CodeBlock.builder().add(init).build())
+                                    .initializer(init.build())
                                     .build()
                     )
                     .addMethod(methodBuilder("of")

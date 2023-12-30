@@ -12,6 +12,8 @@ dependencies {
 
     annotationProcessor(project(":"))
     api(project(":"))
+    implementation("org.hibernate.javax.persistence:hibernate-jpa-2.1-api:1.0.2.Final")
+
 
     implementation("org.springframework.data:spring-data-jpa:3.2.1")
 

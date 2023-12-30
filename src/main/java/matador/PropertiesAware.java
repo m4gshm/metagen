@@ -1,5 +1,5 @@
 package matador;
 
-public interface PropertiesAware {
+public interface PropertiesAware<T> {
     Typed[] properties();
 }

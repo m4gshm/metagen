@@ -22,7 +22,22 @@ public class UserEntityTest {
         assertArrayEquals(UserEntityMeta.Props.values(), metaModel.properties());
         assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
         assertArrayEquals(UserEntityMeta.EntityParams.values(), metaModel.parametersOf(Meta.Parameters.Inherited.Super.class));
-        assertArrayEquals(UserEntityMeta.EntityParams.values(), ((SuperParametersAware)metaModel).superParameters());
+        assertArrayEquals(UserEntityMeta.EntityParams.values(), ((SuperParametersAware) metaModel).superParameters());
+    }
+
+    @Test
+    public void userEntityFieldsReadByGetters() {
+        var metaModel = Model.instance.of(UserEntity.class);
+        assertEquals(UserEntityMeta.class, metaModel.getClass());
+
+        var address = UserEntity.Address.builder()
+                .postalCode("123")
+                .build();
+        var bean = UserEntity.builder().id(1L).age(20).name("Bob").address(address).build();
+        assertEquals(1L, id.get(bean));
+        assertEquals(20, age.get(bean));
+        assertEquals("Bob", name.get(bean));
+        assertSame(address, UserEntityMeta.Props.address.get(bean));
     }
 
     @Test
@@ -45,6 +60,13 @@ public class UserEntityTest {
         var expected = Set.of(age, id, name, address);
         assertEquals(expected.size(), values().length);
         assertEquals(expected, Set.of(values()));
+    }
+
+    @Test
+    @SneakyThrows
+    public void jpaAnnotations() {
+//        UserEntity.class.getMethod(id.name()).getAnnotation(Column.class);
+//        select(UserEntityMeta.Columns).from(UserEntityMeta.Annotations.Table.name);
     }
 }
 

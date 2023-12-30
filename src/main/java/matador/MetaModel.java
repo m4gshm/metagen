@@ -1,6 +1,6 @@
 package matador;
 
-public interface MetaModel<T> extends PropertiesAware, ParametersAware {
+public interface MetaModel<T> extends PropertiesAware<T>, ParametersAware {
 
     Class<T> type();
 

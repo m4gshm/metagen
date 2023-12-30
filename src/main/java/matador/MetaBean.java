@@ -3,9 +3,7 @@ package matador;
 import lombok.Builder;
 import lombok.Data;
 
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +24,7 @@ public class MetaBean {
     private List<MetaBean> interfaces;
     private boolean isRecord;
     private Meta meta;
+    private List<? extends AnnotationMirror> annotations;
 
     public String getClassName() {
         return className != null ? className : type.getSimpleName().toString();
@@ -40,10 +39,12 @@ public class MetaBean {
     @Builder
     public static final class Property {
         private String name;
-        private boolean setter;
-        private boolean getter;
-        private boolean field;
+        private ExecutableElement setter;
+        private ExecutableElement getter;
+        private VariableElement field;
+        private RecordComponentElement recordComponent;
         private TypeMirror type;
+        private List<? extends AnnotationMirror> annotations;
     }
 
     @Data

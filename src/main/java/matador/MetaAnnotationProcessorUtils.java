@@ -2,11 +2,13 @@ package matador;
 
 import io.jbock.javapoet.*;
 import lombok.experimental.UtilityClass;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.util.*;
+import java.util.function.Function;
 
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
@@ -45,8 +47,10 @@ public class MetaAnnotationProcessorUtils {
         return decapitalize(getMethodName(ee).substring(prefix.length()));
     }
 
-    static MetaBean.Property getProperty(Map<String, MetaBean.Property> properties, String propName) {
-        return properties.computeIfAbsent(propName, name -> MetaBean.Property.builder().name(name).build());
+    static MetaBean.Property getProperty(Map<String, MetaBean.Property> properties, String propName,
+                                         List<? extends AnnotationMirror> annotations) {
+        return properties.computeIfAbsent(propName, name -> MetaBean.Property.builder().name(name)
+                .annotations(annotations).build());
     }
 
     static PackageElement getPackage(TypeElement type) {
@@ -93,8 +97,12 @@ public class MetaAnnotationProcessorUtils {
         return "java.lang.Object".equals(type.getQualifiedName().toString());
     }
 
-    static TypeSpec enumConstructor(String value) {
-        return anonymousClassBuilder(CodeBlock.builder().add(value).build()).build();
+    static TypeSpec enumConstructor(String type, CodeBlock getter) {
+        var builder = CodeBlock.builder().add(type);
+        if (getter != null) {
+            builder.add(", ").add(getter);
+        }
+        return anonymousClassBuilder(builder.build()).build();
     }
 
     static String dotClass(String type) {
@@ -128,22 +136,32 @@ public class MetaAnnotationProcessorUtils {
         var typesBuilder = typesEnumBuilder(enumName);
         for (var param : typeParameters) {
             var name = param.getName().getSimpleName().toString();
-            typesBuilder.addEnumConstant(name, enumConstructor(dotClass(getStrType(param.getType(), typeParameters))));
+            typesBuilder.addEnumConstant(name, enumConstructor(dotClass(getStrType(param.getType(), typeParameters)), null));
         }
         return typesBuilder.build();
     }
 
-    static TypeSpec.Builder fieldsEnumBuilder(String enumName) {
-        return typeAwareEnum(enumName);
+    static TypeSpec.Builder fieldsEnumBuilder(String enumName, Getter getter) {
+        return typeAwareEnum(enumName, getter);
     }
 
     private static TypeSpec.Builder typesEnumBuilder(String enumName) {
-        return typeAwareEnum(enumName);
+        return typeAwareEnum(enumName, null);
     }
 
-    private static TypeSpec.Builder typeAwareEnum(String enumName) {
+    @NotNull
+    private static Getter getterType(MetaBean bean) {
+        var beanType = ClassName.get(bean.getType());
+        return new Getter(ParameterizedTypeName.get(ClassName.get(Function.class), beanType, ClassName.get(Object.class)), beanType);
+    }
+
+    private static TypeSpec.Builder typeAwareEnum(String enumName, Getter getter) {
         var typeType = ClassName.get("", "Class<?>");
-        return enumBuilder(enumName)
+        var constructorBody = CodeBlock.builder().addStatement("this." + "type" + " = " + "type");
+
+        var constructor = constructorBuilder().addParameter(typeType, "type");
+
+        var enumBuilder = enumBuilder(enumName)
                 .addSuperinterface(Typed.class)
                 .addModifiers(PUBLIC)
                 .addField(FieldSpec.builder(typeType, "type").addModifiers(PUBLIC, FINAL).build())
@@ -151,24 +169,37 @@ public class MetaAnnotationProcessorUtils {
                         methodBuilder("type")
                                 .addAnnotation(Override.class)
                                 .addModifiers(PUBLIC).returns(typeType)
-                                .addCode("return this.type;")
-                                .build()
-                )
-                .addMethod(
-                        constructorBuilder()
-                                .addParameter(typeType, "type")
-                                .addCode(CodeBlock.builder()
-                                        .add("this." + "type" + " = " + "type" + ";")
-                                        .build())
+                                .addStatement("return this.type")
                                 .build()
                 );
+
+        if (getter != null) {
+            constructor.addParameter(getter.functionType(), "getter");
+            constructorBody.addStatement("this." + "getter" + " = " + "getter");
+            enumBuilder.addField(FieldSpec.builder(getter.functionType(), "getter").addModifiers(PUBLIC, FINAL).build());
+            enumBuilder.addMethod(
+                    methodBuilder("get")
+//                            .addAnnotation(Override.class)
+                            .addModifiers(PUBLIC)
+                            .addParameter(getter.beanType(), "bean")
+                            .returns(ClassName.get(Object.class))
+                            .addStatement("return this.getter.apply(bean)")
+                            .build()
+            );
+        }
+
+        constructor.addCode(constructorBody.build());
+
+        return enumBuilder.addMethod(constructor.build());
     }
 
     static MetaBean getBean(TypeElement type, DeclaredType declaredType, Messager messager) {
         if (type == null || isObjectType(type)) {
             return null;
         }
+
         var isRecord = type.getRecordComponents() != null;
+        var annotations = type.getAnnotationMirrors();
         var meta = type.getAnnotation(Meta.class);
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
@@ -176,16 +207,17 @@ public class MetaAnnotationProcessorUtils {
         var recordComponents = type.getRecordComponents();
         if (recordComponents != null) {
             for (var recordComponent : recordComponents) {
-                var name1 = recordComponent.getSimpleName();
+                var recordName = recordComponent.getSimpleName();
                 var propType = recordComponent.asType();
-                var property = getProperty(properties, name1.toString());
-                property.setGetter(true);
+                var annotationMirrors = recordComponent.getAnnotationMirrors();
+                var property = getProperty(properties, recordName.toString(), annotationMirrors);
+                property.setRecordComponent(recordComponent);
                 updateType(property, propType);
             }
         }
-
         var enclosedElements = type.getEnclosedElements();
         for (var enclosedElement : enclosedElements) {
+            var annotationMirrors = enclosedElement.getAnnotationMirrors();
             var modifiers = enclosedElement.getModifiers();
             var isPublic = modifiers.contains(PUBLIC);
             var isStatic = modifiers.contains(STATIC);
@@ -215,15 +247,19 @@ public class MetaAnnotationProcessorUtils {
                         }
                     }
 
-                    var property = getProperty(properties, propName);
-                    property.setSetter(setter);
-                    property.setGetter(getter || boolGetter);
+                    var property = getProperty(properties, propName, annotationMirrors);
+                    if (setter) {
+                        property.setSetter(ee);
+                    }
+                    if (getter || boolGetter) {
+                        property.setGetter(ee);
+                    }
                     updateType(property, propType);
                 }
             } else if (!isStatic && isPublic && enclosedElement instanceof VariableElement ve) {
                 var propType = ve.asType();
-                var property = getProperty(properties, ve.getSimpleName().toString());
-                property.setField(true);
+                var property = getProperty(properties, ve.getSimpleName().toString(), annotationMirrors);
+                property.setField(ve);
                 updateType(property, propType);
             } else if (enclosedElement instanceof TypeElement te && enclosedElement.getAnnotation(Meta.class) != null) {
                 var nestedBean = getBean(te, null, messager);
@@ -266,6 +302,7 @@ public class MetaAnnotationProcessorUtils {
                 .properties(new ArrayList<>(properties.values()))
                 .modifiers(type.getModifiers())
                 .typeParameters(new ArrayList<>(extractGenericParams(type, declaredType)))
+                .annotations(annotations)
                 .build();
     }
 
@@ -416,7 +453,8 @@ public class MetaAnnotationProcessorUtils {
             var propsInfo = props.get();
             inheritProps = Meta.Properties.METHOD_NAME.equals(propsInfo.methodName());
             var typeName = getUniqueNestedTypeName(propsInfo.className(), nestedTypeNames);
-            var fieldsBuilder = fieldsEnumBuilder(typeName);
+            var getter = getterType(bean);
+            var fieldsBuilder = fieldsEnumBuilder(typeName, getter);
             var propertyNames = new HashSet<String>();
             var properties = bean.getProperties();
             for (var property : properties) {
@@ -424,7 +462,7 @@ public class MetaAnnotationProcessorUtils {
                 if (!propertyNames.add(propertyName)) {
                     throw new IllegalStateException("property already handled, " + propertyName);
                 }
-                getAddEnumConstant(fieldsBuilder, bean.getTypeParameters(), propertyName, property.getType());
+                getAddEnumConstant(fieldsBuilder, bean.getTypeParameters(), propertyName, property.getType(), property, getter);
             }
 
             if (superclass != null) {
@@ -432,7 +470,7 @@ public class MetaAnnotationProcessorUtils {
                 for (var property : superProperties) {
                     var propertyName = property.getName();
                     if (!propertyNames.contains(propertyName)) {
-                        getAddEnumConstant(fieldsBuilder, superclass.getTypeParameters(), propertyName, property.getType());
+                        getAddEnumConstant(fieldsBuilder, superclass.getTypeParameters(), propertyName, property.getType(), property, getter);
                     }
                 }
             }
@@ -493,18 +531,38 @@ public class MetaAnnotationProcessorUtils {
         return builder.build();
     }
 
-    private static void addInheritedParams(CodeBlock.Builder inheritedParamsFieldInitializer,
-                                           ClassName className, String paramsEnumName, boolean addComma) {
-        inheritedParamsFieldInitializer.indent();
+    public static void addInheritedParams(
+            CodeBlock.Builder mapInitializer, ClassName mapKey, String paramsEnumName, boolean addComma
+    ) {
+        var mapValue = CodeBlock.builder().add("$L.values()", paramsEnumName).build().toString();
+        addMapEntry(mapInitializer, mapKey, mapValue, addComma);
+    }
+
+    public static void addMapEntry(
+            CodeBlock.Builder mapInitializer, ClassName mapKey, String mapValue, boolean addComma
+    ) {
+        mapInitializer.indent();
         if (addComma) {
-            inheritedParamsFieldInitializer.add(",\n");
+            mapInitializer.add(",\n");
         }
-        inheritedParamsFieldInitializer.add(
-                "$T.entry($L.class, $L.values())",
+        mapInitializer.add(mapEntry(mapKey, mapValue)).unindent();
+    }
+
+    @NotNull
+    public static CodeBlock mapEntry(ClassName mapKey, String mapValue) {
+        return CodeBlock.builder().add(
+                "$T.entry($L.class, $L)",
                 Map.class,
-                className,
-                paramsEnumName
-        ).unindent();
+                mapKey,
+                mapValue).build();
+    }
+    @NotNull
+    public static CodeBlock mapEntry(String mapKey, String mapValue) {
+        return CodeBlock.builder().add(
+                "$T.entry($L, $L)",
+                Map.class,
+                mapKey,
+                mapValue).build();
     }
 
     private static String getUniqueNestedTypeName(String name, Collection<String> nestedTypeNames) {
@@ -516,10 +574,37 @@ public class MetaAnnotationProcessorUtils {
     }
 
     private static void getAddEnumConstant(Builder fieldsBuilder, List<MetaBean.Param> typeParameters,
-                                           String propertyName, TypeMirror propertyType) {
-        fieldsBuilder.addEnumConstant(
-                propertyName, enumConstructor(dotClass(getStrType(propertyType, typeParameters)))
-        );
+                                           String propertyName, TypeMirror propertyType, MetaBean.Property property,
+                                           Getter getter) {
+        var setter = property.getSetter();
+        var recordComponent = property.getRecordComponent();
+        var field = property.getField();
+
+        var typeArg = dotClass(getStrType(propertyType, typeParameters));
+        var propertyGetter = property.getGetter();
+        final CodeBlock getterArg;
+        if (propertyGetter != null) {
+            var readAccessorName = propertyGetter.getSimpleName();
+            getterArg = CodeBlock.builder().add("$T::$L", getter.beanType(), readAccessorName).build();
+        } else if (recordComponent != null) {
+            var readAccessorName = recordComponent.getAccessor().getSimpleName();
+            getterArg = CodeBlock.builder().add("$T::$L", getter.beanType(), readAccessorName).build();
+        } else if (field != null) {
+            getterArg = CodeBlock.builder().add("bean -> bean.$L", field.getSimpleName()).build();
+        } else {
+            getterArg = CodeBlock.builder().add("bean -> {\n")
+                    .indent()
+                    .addStatement(
+                            "throw new UnsupportedOperationException(\"readonly property '" + propertyName + "'\")"
+                    )
+                    .unindent()
+                    .add("}").build();
+        }
+        fieldsBuilder.addEnumConstant(propertyName, enumConstructor(typeArg, getterArg));
+    }
+
+    private record Getter(ParameterizedTypeName functionType, ClassName beanType) {
+
     }
 
     record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {
