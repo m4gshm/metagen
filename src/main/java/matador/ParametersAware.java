@@ -1,7 +1,9 @@
 package matador;
 
-public interface ParametersAware {
-    Typed[] parameters();
+import java.util.List;
 
-    Typed[] parametersOf(Class<?> inheritedType);
+public interface ParametersAware {
+    List<? extends Typed> parameters();
+
+    List<? extends Typed> parametersOf(Class<?> inheritedType);
 }

@@ -8,6 +8,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
@@ -26,6 +27,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
 
     public static final String INDENT = "$>";
     public static final String UNINDENT = "$<";
+
 
     @Override
     @SneakyThrows
@@ -69,15 +71,6 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
 
         aggregators.forEach((pack, parts) -> {
             var mapParts = parts.mapParts();
-            var init = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
-            for (int i = 0; i < mapParts.size(); i++) {
-                var mapPart = mapParts.get(i);
-                if (i > 0) {
-                    init.add(",\n");
-                }
-                init.add(mapPart);
-            }
-            init.add("\n)");
             var typeName = parts.name;
             var typeSpec = classBuilder(typeName)
                     .addModifiers(PUBLIC, FINAL)
@@ -90,14 +83,8 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                                     )
                                     .build()
                     )
-                    .addField(
-                            builder(
-                                    ParameterizedTypeName.get(Map.class, Class.class, MetaModel.class),
-                                    "metas", PRIVATE, FINAL
-                            )
-                                    .initializer(init.build())
-                                    .build()
-                    )
+                    .addField(mapField("metas", ClassName.get(Class.class), ClassName.get(MetaModel.class),
+                            initMapByEntries(mapParts).build(), PRIVATE, FINAL))
                     .addMethod(methodBuilder("of")
                             .addModifiers(PUBLIC)
                             .addParameter(

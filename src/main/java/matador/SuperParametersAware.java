@@ -1,5 +1,7 @@
 package matador;
 
+import java.util.List;
+
 public interface SuperParametersAware {
-    Typed[] superParameters();
+    List<? extends Typed> superParameters();
 }

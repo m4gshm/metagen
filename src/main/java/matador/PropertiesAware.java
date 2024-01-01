@@ -1,5 +1,8 @@
 package matador;
 
+import java.util.List;
+
 public interface PropertiesAware<T> {
-    Typed[] properties();
+    List<? extends Typed> properties();
+
 }

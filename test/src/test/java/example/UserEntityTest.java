@@ -19,10 +19,10 @@ public class UserEntityTest {
         var metaModel = Model.instance.of(UserEntity.class);
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
-        assertArrayEquals(UserEntityMeta.Props.values(), metaModel.properties());
-        assertArrayEquals(UserEntityMeta.Params.values(), metaModel.parameters());
-        assertArrayEquals(UserEntityMeta.EntityParams.values(), metaModel.parametersOf(Meta.Parameters.Inherited.Super.class));
-        assertArrayEquals(UserEntityMeta.EntityParams.values(), ((SuperParametersAware) metaModel).superParameters());
+        assertEquals(UserEntityMeta.Props.values(), metaModel.properties());
+        assertEquals(UserEntityMeta.Params.values(), metaModel.parameters());
+        assertEquals(UserEntityMeta.EntityParams.values(), metaModel.parametersOf(Meta.Parameters.Inherited.Super.class));
+        assertEquals(UserEntityMeta.EntityParams.values(), ((SuperParametersAware) metaModel).superParameters());
     }
 
     @Test
@@ -58,8 +58,8 @@ public class UserEntityTest {
     @Test
     public void fieldsCompleteness() {
         var expected = Set.of(age, id, name, address);
-        assertEquals(expected.size(), values().length);
-        assertEquals(expected, Set.of(values()));
+        assertEquals(expected.size(), values().size());
+        assertEquals(expected, Set.copyOf(values()));
     }
 
     @Test
