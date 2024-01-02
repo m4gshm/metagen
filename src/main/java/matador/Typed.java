@@ -1,8 +1,8 @@
 package matador;
 
-public interface Typed {
+public interface Typed<T> {
 
     String name();
 
-    Class<?> type();
+    Class<T> type();
 }

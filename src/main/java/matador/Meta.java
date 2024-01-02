@@ -25,7 +25,7 @@ public @interface Meta {
     @interface Properties {
 
         String METHOD_NAME = "properties";
-        String CLASS_NAME = "Props";
+        String CLASS_NAME = "Prop";
 
         boolean enumerate() default true;
 
@@ -38,7 +38,7 @@ public @interface Meta {
     @interface Parameters {
 
         String METHOD_NAME = "parameters";
-        String CLASS_NAME = "Params";
+        String CLASS_NAME = "Param";
 
         boolean enumerate() default true;
 
@@ -59,7 +59,7 @@ public @interface Meta {
             @interface Super {
 
                 String METHOD_NAME = "superParameters";
-                String CLASS_NAME_SUFFIX = "Params";
+                String CLASS_NAME_SUFFIX = "Param";
 
                 boolean enumerate() default true;
 
@@ -72,7 +72,7 @@ public @interface Meta {
             @interface Interfaces {
 
                 String METHOD_NAME = "parametersOf";
-                String CLASS_NAME_SUFFIX = "Params";
+                String CLASS_NAME_SUFFIX = "Param";
 
                 boolean enumerate() default true;
 

@@ -44,6 +44,7 @@ public class MetaBean {
         private VariableElement field;
         private RecordComponentElement recordComponent;
         private TypeMirror type;
+        private TypeMirror evaluatedType;
         private List<? extends AnnotationMirror> annotations;
     }
 
@@ -52,6 +53,7 @@ public class MetaBean {
     public static final class Param {
         private TypeParameterElement name;
         private TypeMirror type;
+        private TypeMirror evaluatedType;
     }
 
     @Data

@@ -9,6 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class EntityTest {
     @Test
     public void paramType() {
-        assertEquals(Serializable.class, EntityMeta.Params.ID.type);
+        assertEquals(Serializable.class, EntityMeta.Param.ID.type);
     }
 }

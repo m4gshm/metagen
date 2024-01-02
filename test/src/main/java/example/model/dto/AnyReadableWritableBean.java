@@ -5,7 +5,11 @@ import lombok.Setter;
 import matador.Meta;
 
 @Meta
-public class OnlyWritableBean {
+public class AnyReadableWritableBean {
+
+    @Getter
+    @Setter
+    private int readWrite;
 
     @Setter
     private int onlyWrite;

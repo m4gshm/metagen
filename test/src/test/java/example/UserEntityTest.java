@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
-import static example.model.UserEntityMeta.Props.*;
+import static example.model.UserEntityMeta.Prop.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class UserEntityTest {
@@ -19,10 +19,10 @@ public class UserEntityTest {
         var metaModel = Model.instance.of(UserEntity.class);
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
-        assertEquals(UserEntityMeta.Props.values(), metaModel.properties());
-        assertEquals(UserEntityMeta.Params.values(), metaModel.parameters());
-        assertEquals(UserEntityMeta.EntityParams.values(), metaModel.parametersOf(Meta.Parameters.Inherited.Super.class));
-        assertEquals(UserEntityMeta.EntityParams.values(), ((SuperParametersAware) metaModel).superParameters());
+        assertEquals(UserEntityMeta.Prop.values(), metaModel.properties());
+        assertEquals(UserEntityMeta.Param.values(), metaModel.parameters());
+        assertEquals(UserEntityMeta.EntityParam.values(), metaModel.parametersOf(Meta.Parameters.Inherited.Super.class));
+        assertEquals(UserEntityMeta.EntityParam.values(), ((SuperParametersAware) metaModel).superParameters());
     }
 
     @Test
@@ -37,7 +37,7 @@ public class UserEntityTest {
         assertEquals(1L, id.get(bean));
         assertEquals(20, age.get(bean));
         assertEquals("Bob", name.get(bean));
-        assertSame(address, UserEntityMeta.Props.address.get(bean));
+        assertSame(address, UserEntityMeta.Prop.address.get(bean));
     }
 
     @Test
