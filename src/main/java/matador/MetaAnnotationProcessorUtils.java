@@ -147,9 +147,10 @@ public class MetaAnnotationProcessorUtils {
         for (var param : typeParameters) {
             var name = param.getName().getSimpleName().toString();
             paramNames.add(name);
-            var type = dotClass(getType(param.getType(), typeParameters));
-            typesBuilder.addField(FieldSpec.builder(className, name, PUBLIC, FINAL, STATIC)
-                    .initializer(newInstanceCall(className, name, type, null)).build());
+            var type = getType(param.getType(), typeParameters);
+            typesBuilder.addField(FieldSpec.builder(ParameterizedTypeName.get(className,
+                            getUnboxedTypeVarName(type)), name, PUBLIC, FINAL, STATIC)
+                    .initializer(newInstanceCall(className, name, dotClass(type), null)).build());
         }
         var uniqueNames = new HashSet<String>(paramNames);
         typesBuilder = populateTypeAwareClass(typesBuilder, classTypeVar, null, uniqueNames);
@@ -168,7 +169,6 @@ public class MetaAnnotationProcessorUtils {
     private static Builder populateTypeAwareClass(
             Builder fieldsBuilder, TypeVariableName classTypeVar, Getter getter, Set<String> uniqueNames
     ) {
-
         var nameName = getUniqueName("name", uniqueNames);
         var typeName = getUniqueName("type", uniqueNames);
         var getterName = getUniqueName("getter", uniqueNames);
@@ -652,8 +652,6 @@ public class MetaAnnotationProcessorUtils {
         var recordComponent = property.getRecordComponent();
         var field = property.getField();
 
-        var type = getType(propertyType, typeParameters);
-        var typeArg = dotClass(type);
         var propertyGetter = property.getGetter();
         final CodeBlock getterArg;
         if (propertyGetter != null) {
@@ -674,12 +672,14 @@ public class MetaAnnotationProcessorUtils {
                     .add("}").build();
         }
 
-        TypeName typeVariableName = type;//TypeVariableName.get(type);
-        typeVariableName = typeVariableName.isPrimitive() ? typeVariableName.box() : typeVariableName;
-
-        fieldsBuilder.addField(FieldSpec.builder(ParameterizedTypeName.get(className, typeVariableName),
+        var type = getType(propertyType, typeParameters);
+        fieldsBuilder.addField(FieldSpec.builder(ParameterizedTypeName.get(className, getUnboxedTypeVarName(type)),
                         propertyName, PUBLIC, FINAL, STATIC)
-                .initializer(newInstanceCall(className, propertyName, typeArg, getterArg)).build());
+                .initializer(newInstanceCall(className, propertyName, dotClass(type), getterArg)).build());
+    }
+
+    private static TypeName getUnboxedTypeVarName(TypeName type) {
+        return type.isPrimitive() ? type.box() : type;
     }
 
     @NotNull
