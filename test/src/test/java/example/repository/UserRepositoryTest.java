@@ -14,8 +14,8 @@ public class UserRepositoryTest {
     @Test
     public void extendedInterfacesParams() {
         var values = UserRepositoryMeta.instance.parametersOf(CrudRepository.class);
-        var params = values.stream().collect(toMap(Typed::name, Typed::type));
-        assertEquals(UserEntity.class, params.get("T"));
-        assertEquals(Long.class, params.get("ID"));
+        var params = values.stream().collect(toMap(t -> t, Typed::type));
+        assertEquals(UserEntity.class, params.get(UserRepositoryMeta.CrudRepositoryParam.T));
+        assertEquals(Long.class, params.get(UserRepositoryMeta.CrudRepositoryParam.ID));
     }
 }
