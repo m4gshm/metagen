@@ -19,7 +19,7 @@ public @interface Meta {
 
     Parameters params() default @Parameters();
 
-    boolean aggregate() default true;
+    Builder builder() default @Builder();
 
     @Retention(SOURCE)
     @interface Properties {
@@ -81,6 +81,19 @@ public @interface Meta {
                 String methodName() default METHOD_NAME;
             }
         }
+    }
+
+    /**
+     * Generates Lombok @Builder, @SuperBuilder meta class.
+     * Experimental feature.
+     */
+    @Retention(SOURCE)
+    @interface Builder {
+        String CLASS_NAME = "BuilderMeta";
+
+        String className() default CLASS_NAME;
+
+        boolean detect() default false;
     }
 
 }

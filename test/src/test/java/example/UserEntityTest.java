@@ -3,6 +3,7 @@ package example;
 import example.model.Model;
 import example.model.UserEntity;
 import example.model.UserEntityMeta;
+import example.model.UserEntityMeta.BuilderMeta;
 import lombok.SneakyThrows;
 import matador.Meta;
 import matador.SuperParametersAware;
@@ -60,6 +61,31 @@ public class UserEntityTest {
         var expected = Set.of(age, id, name, address);
         assertEquals(expected.size(), values().size());
         assertEquals(expected, Set.copyOf(values()));
+    }
+
+    @Test
+    public void userEntityBuilderCompleteness() {
+        var values = BuilderMeta.values();
+        var expected = Set.of(BuilderMeta.age, BuilderMeta.id, BuilderMeta.name, BuilderMeta.address);
+        assertEquals(expected.size(), values.size());
+        assertEquals(expected, Set.copyOf(values));
+    }
+
+    @Test
+    public void userEntityBuilderPopulate() {
+        var address = UserEntity.Address.builder().build();
+
+        var builder = UserEntity.builder();
+        BuilderMeta.id.set(builder, 1L);
+        BuilderMeta.age.set(builder, 20);
+        BuilderMeta.name.set(builder, "name");
+        BuilderMeta.address.set(builder, address);
+
+        var user = builder.build();
+        assertEquals(1L, user.getId());
+        assertEquals(20, user.getAge());
+        assertEquals("name", user.getName());
+        assertSame(address, user.address);
     }
 
     @Test

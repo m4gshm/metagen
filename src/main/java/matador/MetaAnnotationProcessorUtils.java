@@ -2,6 +2,7 @@ package matador;
 
 import io.jbock.javapoet.*;
 import lombok.experimental.UtilityClass;
+import matador.MetaBean.BeanBuilder;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.processing.Messager;
@@ -9,14 +10,15 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
-import static io.jbock.javapoet.TypeSpec.Builder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
 import static java.beans.Introspector.decapitalize;
+import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.*;
@@ -78,7 +80,7 @@ public class MetaAnnotationProcessorUtils {
         for (int i = 0; i < parameters.size(); i++) {
             var paramName = parameters.get(i);
             var paramType = arguments != null ? arguments.get(i) : paramName.asType();
-            var evaluatedType = evalType(paramType, List.of());
+            var evaluatedType = evalType(paramType);
             params.add(MetaBean.Param.builder()
                     .name(paramName)
                     .type(paramType)
@@ -128,11 +130,15 @@ public class MetaAnnotationProcessorUtils {
         return (type != null ? type : TypeName.OBJECT) + ".class";
     }
 
+    static TypeMirror evalType(TypeMirror type) {
+        return evalType(type, List.of());
+    }
+
     static TypeMirror evalType(TypeMirror type, List<MetaBean.Param> beanParameters) {
         return type instanceof TypeVariable typeVariable ? evalType(typeVariable, beanParameters)
                 : type instanceof IntersectionType intersectionType ? evalType(intersectionType, beanParameters)
-                : type instanceof ArrayType || type instanceof DeclaredType || type instanceof PrimitiveType
-                ? type : null;
+                : type instanceof DeclaredType dt ? dt.asElement().asType()
+                : type instanceof ArrayType || type instanceof PrimitiveType ? type : null;
     }
 
     private static TypeMirror evalType(IntersectionType intersectionType, List<MetaBean.Param> beanParameters) {
@@ -151,10 +157,10 @@ public class MetaAnnotationProcessorUtils {
         }
     }
 
-    private static TypeSpec newEnumParams(String enumName, ClassName beanType, List<MetaBean.Param> beanTypeParameters) {
+    private static TypeSpec newEnumParams(String enumName, List<MetaBean.Param> beanTypeParameters) {
         var className = ClassName.get("", enumName);
-        var beanTypeVar = TypeVariableName.get("T");
-        var typesBuilder = typeAwareClass(className, beanTypeVar);
+        var typeVariable = TypeVariableName.get("T");
+        var typesBuilder = typeAwareClass(className, typeVariable);
         var paramNames = new LinkedHashSet<String>();
         for (var param : beanTypeParameters) {
             var name = param.getName().getSimpleName().toString();
@@ -169,7 +175,7 @@ public class MetaAnnotationProcessorUtils {
         var nameFieldName = getUniqueName("name", uniqueNames);
         var typeFieldName = getUniqueName("type", uniqueNames);
         var nameArgType = ClassName.get(String.class);
-        var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), beanTypeVar);
+        var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
         typesBuilder = populateTypeAwareClass(typesBuilder, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
         var constructor = constructorBuilder();
@@ -184,8 +190,8 @@ public class MetaAnnotationProcessorUtils {
     }
 
     @NotNull
-    private static Builder populateTypeAwareClass(Builder fieldsClassBuilder, String nameFieldName, String typeFieldName,
-                                                  ClassName nameArgType, ParameterizedTypeName typeArgType) {
+    private static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder fieldsClassBuilder, String nameFieldName, String typeFieldName,
+                                                           ClassName nameArgType, ParameterizedTypeName typeArgType) {
         return fieldsClassBuilder
                 .addField(FieldSpec.builder(nameArgType, nameFieldName).addModifiers(PUBLIC, FINAL).build())
                 .addField(FieldSpec.builder(typeArgType, typeFieldName).addModifiers(PUBLIC, FINAL).build())
@@ -206,7 +212,7 @@ public class MetaAnnotationProcessorUtils {
     }
 
     private static void addGetter(
-            Builder fieldsClassBuilder, ClassName beanType, TypeVariableName propertyTypeVar,
+            TypeSpec.Builder fieldsClassBuilder, ClassName beanType, TypeVariableName propertyTypeVar,
             ParameterizedTypeName getterType, String getterName
     ) {
         fieldsClassBuilder.addField(FieldSpec.builder(getterType, getterName).addModifiers(PUBLIC, FINAL).build());
@@ -222,11 +228,11 @@ public class MetaAnnotationProcessorUtils {
     }
 
     private static void addSetter(
-            Builder fieldsClassBuilder, ClassName beanType, TypeVariableName propertyTypeVar,
+            TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar,
             ParameterizedTypeName setterType, String setterName
     ) {
-        fieldsClassBuilder.addField(FieldSpec.builder(setterType, setterName).addModifiers(PUBLIC, FINAL).build());
-        fieldsClassBuilder.addMethod(
+        builder.addField(FieldSpec.builder(setterType, setterName).addModifiers(PUBLIC, FINAL).build());
+        builder.addMethod(
                 methodBuilder("set")
                         .addAnnotation(Override.class)
                         .addModifiers(PUBLIC)
@@ -243,12 +249,17 @@ public class MetaAnnotationProcessorUtils {
     }
 
     @NotNull
+    private static ParameterizedTypeName getBiFunctionType(ClassName beanType, TypeVariableName propertyTypeVar, TypeName returnType) {
+        return ParameterizedTypeName.get(ClassName.get(BiFunction.class), beanType, propertyTypeVar, returnType);
+    }
+
+    @NotNull
     private static ParameterizedTypeName getBiConsumerType(ClassName beanType, TypeVariableName propertyTypeVar) {
         return ParameterizedTypeName.get(ClassName.get(BiConsumer.class), beanType, propertyTypeVar);
     }
 
     @NotNull
-    private static Builder typeAwareClass(ClassName className, TypeVariableName typeVariable) {
+    private static TypeSpec.Builder typeAwareClass(ClassName className, TypeVariableName typeVariable) {
         return classBuilder(className)
                 .addTypeVariable(typeVariable)
                 .addSuperinterface(ParameterizedTypeName.get(ClassName.get(Typed.class), typeVariable))
@@ -266,7 +277,7 @@ public class MetaAnnotationProcessorUtils {
                 .addStatement("this." + typeName + " = " + typeName);
     }
 
-    static MetaBean getBean(TypeElement type, DeclaredType declaredType, Messager messager) {
+    static MetaBean getBean(Messager messager, TypeElement type, DeclaredType declaredType) {
         if (type == null || isObjectType(type)) {
             return null;
         }
@@ -337,7 +348,7 @@ public class MetaAnnotationProcessorUtils {
                 property.setField(ve);
                 updateType(property, propType, typeParameters);
             } else if (enclosedElement instanceof TypeElement te && enclosedElement.getAnnotation(Meta.class) != null) {
-                var nestedBean = getBean(te, null, messager);
+                var nestedBean = getBean(messager, te, null);
                 var nestedBeanClassName = nestedBean.getClassName();
                 var exists = nestedTypes.get(nestedBeanClassName);
                 if (exists == null) {
@@ -357,21 +368,25 @@ public class MetaAnnotationProcessorUtils {
         }
 
         var superBean = ofNullable(getTypeInfo(type.getSuperclass())).map(superclass ->
-                getBean(superclass.typeElement, superclass.declaredType, messager)
+                getBean(messager, superclass.typeElement, superclass.declaredType)
         ).orElse(null);
 
         var interfaceBeans = type.getInterfaces().stream().map(MetaAnnotationProcessorUtils::getTypeInfo)
-                .filter(Objects::nonNull).map(iface -> getBean(iface.typeElement, iface.declaredType, messager))
+                .filter(Objects::nonNull).map(iface -> getBean(messager, iface.typeElement, iface.declaredType))
                 .toList();
 
         var name = type.getSimpleName().toString();
-        var suffix = meta != null ? meta.suffix() : null;
+        var suffix = ofNullable(meta).map(Meta::suffix).map(String::trim).filter(m -> !m.isEmpty()).orElse(Meta.META);
+        var builder = ofNullable(meta).map(Meta::builder);
+        var superBuilderInfo = superBean != null ? superBean.getBeanBuilderInfo() : null;
+        var beanBuilder = builder.map(Meta.Builder::detect).orElse(false)
+                ? newBeanBuilder(messager, type, typeParameters, builder.map(Meta.Builder::className).orElse(Meta.Builder.CLASS_NAME), superBuilderInfo) : null;
 
         return MetaBean.builder()
                 .isRecord(isRecord)
                 .type(type)
                 .meta(meta)
-                .name(name + (suffix == null || suffix.trim().isEmpty() ? Meta.META : suffix))
+                .name(name + suffix)
                 .superclass(superBean)
                 .interfaces(interfaceBeans)
                 .nestedTypes(new ArrayList<>(nestedTypes.values()))
@@ -379,6 +394,7 @@ public class MetaAnnotationProcessorUtils {
                 .modifiers(type.getModifiers())
                 .typeParameters(typeParameters)
                 .annotations(annotations)
+                .beanBuilderInfo(beanBuilder)
                 .build();
     }
 
@@ -396,18 +412,18 @@ public class MetaAnnotationProcessorUtils {
         return !prefix.isEmpty() ? prefix : METAS;
     }
 
-    static MethodSpec enumValuesMethod(String name, TypeName typeClassName, boolean overr) {
-        var code = CodeBlock.builder()
-                .addStatement("return $T.values()", typeClassName)
-                .build();
-        return enumValuesMethodBuilder(name, typeClassName, overr, code).build();
+    static MethodSpec callValuesMethod(String name, TypeName typeClassName, boolean overr) {
+        return returnListMethodBuilder(
+                name, typeClassName, overr,
+                CodeBlock.builder().addStatement("return $T.values()", typeClassName).build()
+        ).build();
     }
 
-    static MethodSpec.Builder enumValuesMethodBuilder(String name, TypeName typeClassName, boolean overr, CodeBlock codeBlock) {
+    static MethodSpec.Builder returnListMethodBuilder(String name, TypeName typeClassName, boolean overr, CodeBlock code) {
         var builder = methodBuilder(name)
                 .addModifiers(PUBLIC)
                 .returns(ParameterizedTypeName.get(ClassName.get(List.class), typeClassName))
-                .addCode(codeBlock);
+                .addCode(code);
         if (overr) {
             builder.addAnnotation(Override.class);
         }
@@ -462,9 +478,9 @@ public class MetaAnnotationProcessorUtils {
             var methodName = params.methodName();
             inheritParams = Meta.Parameters.METHOD_NAME.equals(methodName);
 
-            builder.addType(newEnumParams(typeName, beanType, bean.getTypeParameters()));
+            builder.addType(newEnumParams(typeName, bean.getTypeParameters()));
             builder.addMethod(
-                    enumValuesMethod(methodName, ClassName.get("", typeName), inheritParams)
+                    callValuesMethod(methodName, ClassName.get("", typeName), inheritParams)
             );
 
             var fieldName = "inheritedParams";
@@ -483,9 +499,9 @@ public class MetaAnnotationProcessorUtils {
                 var superTypeName = getUniqueName(
                         superclass.getClassName() + parentClass.classNameSuffix(), uniqueNames
                 );
-                builder.addType(newEnumParams(superTypeName, beanType, superclass.getTypeParameters()));
+                builder.addType(newEnumParams(superTypeName, superclass.getTypeParameters()));
                 builder.addMethod(
-                        enumValuesMethod(parentClass.methodName(), ClassName.get("", superTypeName), inheritSuperParams)
+                        callValuesMethod(parentClass.methodName(), ClassName.get("", superTypeName), inheritSuperParams)
                 );
                 addInheritedParams(
                         inheritedParamsFieldInitializer,
@@ -506,16 +522,16 @@ public class MetaAnnotationProcessorUtils {
                     var ifaceParametersEnumName = getUniqueName(
                             iface.getClassName() + interfacesParams.classNameSuffix(), uniqueNames
                     );
-                    builder.addType(newEnumParams(ifaceParametersEnumName, beanType, iface.getTypeParameters()));
+                    builder.addType(newEnumParams(ifaceParametersEnumName, iface.getTypeParameters()));
                     addInheritedParams(inheritedParamsFieldInitializer, ClassName.get(iface.getPackageName(), iface.getClassName()), ifaceParametersEnumName, addSuperParams || i > 0);
                 }
                 inheritedParamsField.initializer(inheritedParamsFieldInitializer.add("\n)").build());
                 builder.addField(inheritedParamsField.build());
-                var code = CodeBlock.builder()
-                        .addStatement("return $L.get(type)", fieldName)
-                        .build();
-                builder.addMethod(enumValuesMethodBuilder(interfacesParams.methodName(),
-                        WildcardTypeName.subtypeOf(Typed.class), inheritParamsOf, code
+                builder.addMethod(returnListMethodBuilder(
+                        interfacesParams.methodName(),
+                        WildcardTypeName.subtypeOf(Typed.class),
+                        inheritParamsOf,
+                        CodeBlock.builder().addStatement("return $L.get(type)", fieldName).build()
                 ).addParameter(ParameterSpec.builder(Class.class, "type").build()).build());
             }
         }
@@ -525,8 +541,8 @@ public class MetaAnnotationProcessorUtils {
             var propsInfo = props.get();
             inheritProps = Meta.Properties.METHOD_NAME.equals(propsInfo.methodName());
             var typeName = ClassName.get("", getUniqueName(propsInfo.className(), uniqueNames));
-            var propertyTypeVar = TypeVariableName.get("T");
-            var fieldsClassBuilder = typeAwareClass(typeName, propertyTypeVar);
+            var typeVariable = TypeVariableName.get("T");
+            var fieldsClassBuilder = typeAwareClass(typeName, typeVariable);
 
             var propertyPerName = new LinkedHashMap<String, MetaBean.Property>();
             var allReadable = true;
@@ -585,22 +601,21 @@ public class MetaAnnotationProcessorUtils {
                     writeUsed = true;
                 }
                 var typ = full ? readWriteTypeName : read ? readTypeName : writable ? writeTypeName : typeName;
-                fieldsClassBuilder.addField(newConstant(typ, property, beanType));
+                fieldsClassBuilder.addField(newPropertyConstant(beanType, property, typ));
             }
 
-
-            var readWriteInterface = ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, propertyTypeVar);
-            var writeInterface = ParameterizedTypeName.get(ClassName.get(Write.class), beanType, propertyTypeVar);
-            var readInterface = ParameterizedTypeName.get(ClassName.get(Read.class), beanType, propertyTypeVar);
+            var readWriteInterface = ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable);
+            var writeInterface = writeInterface(beanType, typeVariable);
+            var readInterface = ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
 
             var nameArgType = ClassName.get(String.class);
-            var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), propertyTypeVar);
+            var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
 
             if (rwUsed && !readWriteTypeName.equals(typeName)) {
                 var getterArgName = "getter";
                 var setterArgName = "setter";
-                var getter = getFunctionType(beanType, propertyTypeVar);
-                var setter = getBiConsumerType(beanType, propertyTypeVar);
+                var getter = getFunctionType(beanType, typeVariable);
+                var setter = getBiConsumerType(beanType, typeVariable);
 
                 var constructor = constructorBuilder().addModifiers(PRIVATE)
                         .addParameter(nameArgType, "name")
@@ -617,19 +632,19 @@ public class MetaAnnotationProcessorUtils {
 
                 var subType = classBuilder(readWriteTypeName)
                         .addModifiers(STATIC, FINAL, PUBLIC)
-                        .superclass(ParameterizedTypeName.get(typeName, propertyTypeVar))
-                        .addTypeVariable(propertyTypeVar)
+                        .superclass(ParameterizedTypeName.get(typeName, typeVariable))
+                        .addTypeVariable(typeVariable)
                         .addSuperinterface(readWriteInterface)
                         .addMethod(constructor.build());
-                addGetter(subType, beanType, propertyTypeVar, getter, getterArgName);
-                addSetter(subType, beanType, propertyTypeVar, setter, setterArgName);
+                addGetter(subType, beanType, typeVariable, getter, getterArgName);
+                addSetter(subType, beanType, typeVariable, setter, setterArgName);
 
                 fieldsClassBuilder.addType(subType.build());
             }
 
             if (readUsed && !readTypeName.equals(typeName)) {
                 var getterArgName = "getter";
-                var getter = getFunctionType(beanType, propertyTypeVar);
+                var getter = getFunctionType(beanType, typeVariable);
 
                 var constructor = constructorBuilder().addModifiers(PRIVATE)
                         .addParameter(nameArgType, "name")
@@ -644,19 +659,19 @@ public class MetaAnnotationProcessorUtils {
 
                 var subType = classBuilder(readTypeName)
                         .addModifiers(STATIC, FINAL, PUBLIC)
-                        .superclass(ParameterizedTypeName.get(typeName, propertyTypeVar))
-                        .addTypeVariable(propertyTypeVar)
+                        .superclass(ParameterizedTypeName.get(typeName, typeVariable))
+                        .addTypeVariable(typeVariable)
                         .addSuperinterface(readInterface)
                         .addMethod(constructor.build());
 
-                addGetter(subType, beanType, propertyTypeVar, getter, getterArgName);
+                addGetter(subType, beanType, typeVariable, getter, getterArgName);
 
                 fieldsClassBuilder.addType(subType.build());
             }
 
             if (writeUsed && !writeTypeName.equals(typeName)) {
                 var setterArgName = "setter";
-                var setter = getBiConsumerType(beanType, propertyTypeVar);
+                var setter = getBiConsumerType(beanType, typeVariable);
 
                 var constructor = constructorBuilder().addModifiers(PRIVATE)
                         .addParameter(nameArgType, "name")
@@ -671,12 +686,12 @@ public class MetaAnnotationProcessorUtils {
 
                 var subType = classBuilder(writeTypeName)
                         .addModifiers(STATIC, FINAL, PUBLIC)
-                        .superclass(ParameterizedTypeName.get(typeName, propertyTypeVar))
-                        .addTypeVariable(propertyTypeVar)
+                        .superclass(ParameterizedTypeName.get(typeName, typeVariable))
+                        .addTypeVariable(typeVariable)
                         .addSuperinterface(writeInterface)
                         .addMethod(constructor.build());
 
-                addSetter(subType, beanType, propertyTypeVar, setter, setterArgName);
+                addSetter(subType, beanType, typeVariable, setter, setterArgName);
 
                 fieldsClassBuilder.addType(subType.build());
             }
@@ -696,9 +711,9 @@ public class MetaAnnotationProcessorUtils {
 
             if (allReadable) {
                 var getterFieldName = getUniqueName("getter", uniqueNames);
-                var getterFunction = getFunctionType(beanType, propertyTypeVar);
+                var getterFunction = getFunctionType(beanType, typeVariable);
 
-                addGetter(fieldsClassBuilder, beanType, propertyTypeVar, getterFunction, getterFieldName);
+                addGetter(fieldsClassBuilder, beanType, typeVariable, getterFunction, getterFieldName);
 
                 constructor.addParameter(getterFunction, "getter");
                 constructorBody.addStatement("this." + getterFieldName + " = " + "getter");
@@ -706,9 +721,9 @@ public class MetaAnnotationProcessorUtils {
 
             if (allWritable) {
                 var setterFieldName = getUniqueName("setter", uniqueNames);
-                var setterConsumer = getBiConsumerType(beanType, propertyTypeVar);
+                var setterConsumer = getBiConsumerType(beanType, typeVariable);
 
-                addSetter(fieldsClassBuilder, beanType, propertyTypeVar, setterConsumer, setterFieldName);
+                addSetter(fieldsClassBuilder, beanType, typeVariable, setterConsumer, setterFieldName);
 
                 constructor.addParameter(setterConsumer, "setter");
                 constructorBody.addStatement("this." + setterFieldName + " = " + "setter");
@@ -728,7 +743,7 @@ public class MetaAnnotationProcessorUtils {
 
             builder.addType(fieldsClassBuilder.build());
             builder.addMethod(
-                    enumValuesMethod(propsInfo.methodName(), typeName, inheritProps)
+                    callValuesMethod(propsInfo.methodName(), typeName, inheritProps)
             );
         }
 
@@ -772,18 +787,212 @@ public class MetaAnnotationProcessorUtils {
             builder.addType(newTypeBean(nestedBean, STATIC));
         }
 
-//        if (addParamsEnum) {
-//            if (interfaces != null) interfaces.forEach((interfaceMeta) -> {
-//                var interfaceName = getUniqueNestedTypeName(interfaceMeta.getClassName(), uniqueNames);
-//                builder.addType(newTypeInterface(interfaceName, meta.get().params().className(), interfaceMeta));
-//            });
-//        }
+        var beanBuilderInfo = bean.getBeanBuilderInfo();
+        if (beanBuilderInfo != null) {
+            builder.addType(newBuilderType(beanBuilderInfo));
+        }
 
         return builder.build();
     }
 
     @NotNull
-    private static Builder addValues(Builder builder, ClassName typeName, Set<String> propertyNames, Set<String> uniqueNames) {
+    private static ParameterizedTypeName writeInterface(ClassName beanType, TypeVariableName typeVariable) {
+        return ParameterizedTypeName.get(ClassName.get(Write.class), beanType, typeVariable);
+    }
+
+    private static TypeSpec newBuilderType(BeanBuilder builderInfo) {
+        var type = builderInfo.getType();
+        var beanType = ClassName.get(type);
+
+        var metaClassName = builderInfo.getMetaClassName();
+        var className = ClassName.get("", metaClassName);
+        var typeVariable = TypeVariableName.get("T");
+        var builder = typeAwareClass(className, typeVariable).addModifiers(FINAL);
+
+        var setterNames = new ArrayList<String>();
+        for (var setter : builderInfo.getSetters()) {
+            var setterName = setter.getName();
+            builder.addField(newPropertyConstant(
+                    beanType, setter.getEvaluatedType(), className, setterName,
+                    null, null, setter.getSetter(), null));
+            setterNames.add(setterName);
+        }
+        var uniqueNames = new HashSet<>(setterNames);
+
+        var nameFieldName = getUniqueName("name", uniqueNames);
+        var typeFieldName = getUniqueName("type", uniqueNames);
+        var setterFieldName = getUniqueName("setter", uniqueNames);
+        var setterArgName = "setter";
+
+        var nameArgType = ClassName.get(String.class);
+        var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
+        var setterType = getBiConsumerType(beanType, typeVariable);
+
+        builder = populateTypeAwareClass(builder, nameFieldName, typeFieldName, nameArgType, typeArgType);
+
+        var constructor = constructorBuilder();
+        var constructorBody = CodeBlock.builder();
+        populateConstructor(constructor, constructorBody, nameArgType, nameFieldName, typeArgType, typeFieldName);
+
+        constructor.addParameter(setterType, setterArgName);
+        constructorBody.addStatement("this." + setterFieldName + " = " + setterArgName);
+
+        constructor.addCode(constructorBody.build());
+
+        builder.addMethod(constructor.build());
+
+        builder.addField(FieldSpec.builder(setterType, setterFieldName).addModifiers(PUBLIC, FINAL).build());
+        builder.addMethod(
+                methodBuilder("set")
+                        .addAnnotation(Override.class)
+                        .addModifiers(PUBLIC)
+                        .addParameter(beanType, "builder")
+                        .addParameter(typeVariable, "value")
+                        .addStatement(setterFieldName + ".accept(builder, value)")
+                        .build()
+        );
+
+        addValues(builder, className, setterNames, uniqueNames);
+
+        builder.addSuperinterface(writeInterface(beanType, typeVariable));
+        return builder.build();
+    }
+
+    private static BeanBuilder newBeanBuilder(
+            Messager messager, TypeElement beanType, List<MetaBean.Param> typeParameters,
+            String metaClassName, BeanBuilder superBuilder) {
+        var builderAnnotation = beanType.getAnnotationMirrors().stream().filter(a -> {
+            var name = a.getAnnotationType().toString();
+            return Set.of(
+                    "lombok.Builder",
+                    "lombok.SuperBuilder",
+                    "lombok.experimental.SuperBuilder"
+            ).contains(name);
+        }).findAny().orElse(null);
+        if (builderAnnotation != null) {
+            var isInheritor = builderAnnotation.getAnnotationType().toString().contains("SuperBuilder");
+            var annotationType = builderAnnotation.getAnnotationType();
+            var elementValues = builderAnnotation.getElementValues();
+            var values = elementValues.entrySet().stream().collect(toMap(e -> e.getKey().toString(), e -> e.getValue().getValue()));
+
+            var defaultValues = annotationType.asElement().getEnclosedElements().stream()
+                    .map(e -> e instanceof ExecutableElement ee ? ee : null).filter(Objects::nonNull)
+                    .collect(toMap(e -> e.getSimpleName().toString(), e -> ofNullable(e.getDefaultValue()).map(AnnotationValue::getValue).orElse("")));
+
+            var builderClassName = of(getAnnotationValue("builderClassName", values, defaultValues))
+                    .map(v -> v.isEmpty() ? beanType.getSimpleName() + "Builder" : v).get();
+
+            var builderType = beanType.getEnclosedElements().stream()
+                    .map(e -> e instanceof TypeElement te ? te : null)
+                    .filter(e -> e != null && e.getSimpleName().contentEquals(builderClassName)
+                            && beanType.equals(e.getEnclosingElement())
+                    ).findFirst().orElse(null);
+
+            if (builderType == null) {
+                messager.printWarning("cannot determine builder class '" + builderClassName + "'", beanType);
+                return null;
+            } else {
+                var builderMethodName = getAnnotationValue("builderMethodName", values, defaultValues);
+                var buildMethodName = getAnnotationValue("buildMethodName", values, defaultValues);
+                var setterPrefix = getAnnotationValue("setterPrefix", values, defaultValues);
+
+                var setters = getBuilderSetters(builderType, isInheritor ? superBuilder : null);
+
+                return BeanBuilder.builder()
+                        .metaClassName(metaClassName)
+                        .className(builderClassName)
+                        .setPrefix(setterPrefix)
+                        .type(builderType)
+                        .typeParameters(typeParameters)
+                        .builderMethodName(builderMethodName)
+                        .buildMethodName(buildMethodName)
+                        .setters(setters)
+                        .build();
+            }
+        }
+        return null;
+    }
+
+    private static ArrayList<BeanBuilder.Setter> getBuilderSetters(TypeElement typeElement, BeanBuilder superBuilder) {
+        var setters = new ArrayList<BeanBuilder.Setter>();
+        var builderType = typeElement.asType();
+        var element = typeElement;
+        DeclaredType declaredType = null;
+        while (element != null && !isObjectType(element)) {
+            var typeParameters = extractGenericParams(element, declaredType);
+            var builderElements = element.getEnclosedElements();
+            for (var enclosedElement : builderElements) {
+                var modifiers = enclosedElement.getModifiers();
+                var isPublic = modifiers.contains(PUBLIC);
+                var isStatic = modifiers.contains(STATIC);
+                if (!isStatic && isPublic && enclosedElement instanceof ExecutableElement ee) {
+                    var returnType = evalType(ee.getReturnType(), typeParameters);
+                    var returnSame = builderType.equals(returnType);
+                    var parameters = ee.getParameters();
+                    if (returnSame && parameters.size() == 1) {
+                        var paramElement = parameters.get(0);
+                        var paramType = paramElement.asType();
+                        var evaluatedType = evalType(paramType, typeParameters);
+                        setters.add(BeanBuilder.Setter.builder().type(paramType).evaluatedType(evaluatedType)
+                                .name(ee.getSimpleName().toString()).setter(ee).build());
+                    }
+                }
+            }
+            if (element.getSuperclass() instanceof DeclaredType dt) {
+                if (dt.asElement() instanceof TypeElement te) {
+                    if (superBuilder != null && dt.getKind() == TypeKind.ERROR) {
+                        //actual to the Lombok @SuperBuilder
+                        var typeArguments = dt.getTypeArguments();
+
+                        var superBuilderType = superBuilder.getType();
+                        var superParameters = superBuilderType.getTypeParameters();
+                        var actualizedSuperSetters = superBuilder.getSetters().stream().map(setter -> {
+                            if (setter.getType() instanceof TypeVariable typeVariable) {
+                                var i = getIndex(typeVariable.asElement(), superParameters);
+                                var typeMirror = i >= 0 && i < typeArguments.size() ? typeArguments.get(i) : null;
+                                return typeMirror != null ? setter.toBuilder().evaluatedType(typeMirror).build() : setter;
+                            }
+                            return setter;
+                        }).toList();
+                        setters.addAll(actualizedSuperSetters);
+                        element = null;
+                        declaredType = null;
+                    } else {
+                        element = te;
+                        declaredType = dt;
+                    }
+                } else {
+                    element = null;
+                    declaredType = null;
+                }
+            } else {
+                break;
+            }
+        }
+        return setters;
+    }
+
+    private static int getIndex(Element typeVariable, List<? extends TypeParameterElement> typeParameters) {
+        if (typeVariable == null) {
+            return -1;
+        }
+        for (int i = 0; i < typeParameters.size(); i++) {
+            var typeParameter = typeParameters.get(i);
+            if (typeVariable.equals(typeParameter)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static String getAnnotationValue(String attributeName, Map<String, Object> values, Map<String, Object> defaultValues) {
+        return ofNullable(values.getOrDefault(attributeName, defaultValues.get(attributeName))).map(Object::toString).orElse("");
+    }
+
+    @NotNull
+    private static TypeSpec.Builder addValues(
+            TypeSpec.Builder builder, ClassName typeName, Collection<String> propertyNames, Set<String> uniqueNames
+    ) {
         var valuesField = getUniqueName("values", uniqueNames);
         return builder
                 .addField(listField(valuesField, typeName, CodeBlock.builder()
@@ -853,19 +1062,27 @@ public class MetaAnnotationProcessorUtils {
     }
 
     @NotNull
-    private static FieldSpec newConstant(ClassName fieldType, MetaBean.Property property, ClassName beanType) {
-        var propertyName = property.getName();
-        var recordComponent = property.getRecordComponent();
+    private static FieldSpec newPropertyConstant(ClassName beanType, MetaBean.Property property, ClassName constType) {
+        var name = property.getName();
+        var type = property.getEvaluatedType();
         var field = property.getField();
+        var record = property.getRecordComponent();
+        var getter = property.getGetter();
+        var setter = property.getSetter();
+        return newPropertyConstant(beanType, type, constType, name, field, getter, setter, record);
+    }
 
-        var propertyGetter = property.getGetter();
-        var propertySetter = property.getSetter();
-        final CodeBlock getterArg, setterArg;
-        if (propertyGetter != null) {
-            var readAccessorName = propertyGetter.getSimpleName();
-            getterArg = CodeBlock.builder().add("$T::$L", beanType, readAccessorName).build();
-        } else if (recordComponent != null) {
-            var readAccessorName = recordComponent.getAccessor().getSimpleName();
+    @NotNull
+    private static FieldSpec newPropertyConstant(ClassName beanType, TypeMirror propertyType,
+                                                 ClassName constType, String constName,
+                                                 VariableElement field, ExecutableElement getter,
+                                                 ExecutableElement setter, RecordComponentElement record) {
+        final CodeBlock getterArg;
+        var getterName = ofNullable(getter).map(ExecutableElement::getSimpleName).orElse(null);
+        if (getterName != null) {
+            getterArg = CodeBlock.builder().add("$T::$L", beanType, getterName).build();
+        } else if (record != null) {
+            var readAccessorName = record.getAccessor().getSimpleName();
             getterArg = CodeBlock.builder().add("$T::$L", beanType, readAccessorName).build();
         } else if (field != null) {
             getterArg = CodeBlock.builder().add("bean -> bean.$L", field.getSimpleName()).build();
@@ -873,19 +1090,20 @@ public class MetaAnnotationProcessorUtils {
             getterArg = null;
         }
 
-        if (propertySetter != null) {
-            var writeAccessorName = propertySetter.getSimpleName();
-            setterArg = CodeBlock.builder().add("$T::$L", beanType, writeAccessorName).build();
-        } else if (recordComponent == null && field != null) {
+        final CodeBlock setterArg;
+        var setterName = ofNullable(setter).map(ExecutableElement::getSimpleName).orElse(null);
+        if (setterName != null) {
+            setterArg = CodeBlock.builder().add("$T::$L", beanType, setterName).build();
+        } else if (record == null && field != null) {
             setterArg = CodeBlock.builder().add("(bean, value) -> bean.$L = value", field.getSimpleName()).build();
         } else {
             setterArg = null;
         }
 
-        var type = TypeName.get(property.getEvaluatedType());
-        return builder(
-                ParameterizedTypeName.get(fieldType, getUnboxedTypeVarName(type)), propertyName, PUBLIC, FINAL, STATIC
-        ).initializer(newInstanceCall(fieldType, enumConstructorArgs(propertyName, dotClass(type), getterArg, setterArg))).build();
+        var typeName = TypeName.get(propertyType);
+        return FieldSpec.builder(
+                ParameterizedTypeName.get(constType, getUnboxedTypeVarName(typeName)), constName, PUBLIC, FINAL, STATIC
+        ).initializer(newInstanceCall(constType, enumConstructorArgs(constName, dotClass(typeName), getterArg, setterArg))).build();
     }
 
     private static TypeName getUnboxedTypeVarName(TypeName type) {

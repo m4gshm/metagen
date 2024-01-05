@@ -8,7 +8,6 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
-import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
@@ -36,7 +35,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         var beans = elements.stream()
                 .map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull)
                 .filter(type -> type.getEnclosingElement() instanceof PackageElement)
-                .map(type -> getBean(type, null, processingEnv.getMessager())).toList();
+                .map(type -> getBean(this.processingEnv.getMessager(), type, null)).toList();
 
         record AggregatorParts(String package_, String name, List<String> mapParts) {
 
@@ -48,11 +47,10 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             var name = bean.getName();
 
             var typeSpec = newTypeBean(bean);
-            var inheritMetamodel = typeSpec.superinterfaces.stream()
-                    .anyMatch(s -> {
-                        var expected = ClassName.get(MetaModel.class);
-                        return s instanceof ParameterizedTypeName p ? p.rawType.equals(expected) : s.equals(expected);
-                    });
+            var inheritMetamodel = typeSpec.superinterfaces.stream().anyMatch(s -> {
+                var expected = ClassName.get(MetaModel.class);
+                return s instanceof ParameterizedTypeName p ? p.rawType.equals(expected) : s.equals(expected);
+            });
 
             if (inheritMetamodel) {
                 var aggParts = aggregators.computeIfAbsent(beanPackage,

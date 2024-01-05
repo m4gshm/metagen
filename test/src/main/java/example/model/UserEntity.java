@@ -8,15 +8,14 @@ import matador.Meta;
 
 import javax.persistence.Column;
 import javax.persistence.Embedded;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 import static lombok.AccessLevel.NONE;
+import static lombok.AccessLevel.PUBLIC;
 
-@Meta
 @Data
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
+@Meta(builder = @Meta.Builder(detect = true))
 @javax.persistence.Entity
 public class UserEntity extends Entity<Long> implements IdAware<Long> {
     @Getter(NONE)
@@ -28,19 +27,9 @@ public class UserEntity extends Entity<Long> implements IdAware<Long> {
     @Column(name = "AG_E")
     Integer age;
 
-//    @RequiredArgsConstructor
-//    public enum DBColumns {
-//
-//        NAME(userEntity -> userEntity.name, ), AG_E, POSTAL_CODE, CITY, STREET;
-//
-//        private final Function<UserEntity, Object> getter;
-//        public final BiConsumer<UserEntity, Object> setter;
-
-//    }
-
     @Meta
     @Data
-    @Builder
+    @Builder(access = PUBLIC, toBuilder = true)
     @NoArgsConstructor
     @AllArgsConstructor
     public static class Address {

@@ -24,6 +24,7 @@ public class MetaBean {
     private List<MetaBean> interfaces;
     private boolean isRecord;
     private Meta meta;
+    private BeanBuilder beanBuilderInfo;
     private List<? extends AnnotationMirror> annotations;
 
     public String getClassName() {
@@ -33,6 +34,27 @@ public class MetaBean {
     public String getPackageName() {
         var packageElement = getPackage(type);
         return packageElement != null ? packageElement.getQualifiedName().toString() : null;
+    }
+
+    @Data
+    @Builder
+    public static final class BeanBuilder {
+        private String metaClassName;
+        private String className;
+        private String setPrefix;
+        private String builderMethodName;
+        private String buildMethodName;
+        private TypeElement type;
+        private List<Param> typeParameters;
+        private List<Setter> setters;
+        @Data
+        @Builder(toBuilder = true)
+        public static final class Setter {
+            private String name;
+            private TypeMirror type;
+            private TypeMirror evaluatedType;
+            private ExecutableElement setter;
+        }
     }
 
     @Data
