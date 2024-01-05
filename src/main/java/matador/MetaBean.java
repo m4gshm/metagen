@@ -8,7 +8,7 @@ import javax.lang.model.type.TypeMirror;
 import java.util.List;
 import java.util.Set;
 
-import static matador.MetaAnnotationProcessorUtils.getPackage;
+import static matador.MetaBeanUtils.getPackage;
 
 @Data
 @Builder(toBuilder = true)

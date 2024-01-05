@@ -1,11 +1,11 @@
 plugins {
-    id("java-library")
     kotlin("jvm")
+    `java-library`
+    `maven-publish`
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
-
+group = "com.github.m4gshm"
+version = "0.1-SNAPSHOT"
 
 allprojects {
     repositories {
@@ -30,9 +30,38 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
-repositories {
-    mavenCentral()
-}
+
 kotlin {
-    jvmToolchain(19)
+    jvmToolchain(17)
+}
+
+java {
+    withSourcesJar()
+    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_17
+    modularity.inferModulePath.set(true)
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("java") {
+            pom {
+                properties.put("maven.compiler.target", "${java.targetCompatibility}")
+                properties.put("maven.compiler.source", "${java.sourceCompatibility}")
+                developers {
+                    developer {
+                        id.set("m4gshm")
+                        name.set("Bulgakov Alexander")
+                        email.set("mfourgeneralsherman@gmail.com")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:https://github.com/m4gshm/matador.git")
+                    developerConnection.set("scm:git:https://github.com/m4gshm/matador.git")
+                    url.set("https://github.com/m4gshm/matador")
+                }
+            }
+            from(components["java"])
+        }
+    }
 }

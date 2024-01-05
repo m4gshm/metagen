@@ -18,15 +18,13 @@ import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
 import static javax.lang.model.element.Modifier.*;
-import static matador.MetaAnnotationProcessorUtils.*;
+import static matador.JavaPoetUtils.initMapByEntries;
+import static matador.MetaBeanUtils.getAggregatorName;
+import static matador.MetaBeanUtils.getBean;
 
 @SupportedAnnotationTypes("matador.Meta")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class MetaAnnotationProcessor extends AbstractProcessor {
-
-    public static final String INDENT = "$>";
-    public static final String UNINDENT = "$<";
-
 
     @Override
     @SneakyThrows
@@ -46,7 +44,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             var beanPackage = bean.getPackageName();
             var name = bean.getName();
 
-            var typeSpec = newTypeBean(bean);
+            var typeSpec = JavaPoetUtils.newTypeBean(bean);
             var inheritMetamodel = typeSpec.superinterfaces.stream().anyMatch(s -> {
                 var expected = ClassName.get(MetaModel.class);
                 return s instanceof ParameterizedTypeName p ? p.rawType.equals(expected) : s.equals(expected);
@@ -60,7 +58,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                 if (mapParts.size() > 1) {
                     mapParts.add(",\n");
                 }
-                mapParts.add(mapEntry(bean.getClassName() + ".class", "new " + name + "()").toString());
+                mapParts.add(JavaPoetUtils.mapEntry(bean.getClassName() + ".class", "new " + name + "()").toString());
             }
 
             var javaFileObject = JavaFile.builder(beanPackage, typeSpec).build().toJavaFileObject();
@@ -81,7 +79,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                                     )
                                     .build()
                     )
-                    .addField(mapField("metas", ClassName.get(Class.class), ClassName.get(MetaModel.class),
+                    .addField(JavaPoetUtils.mapField("metas", ClassName.get(Class.class), ClassName.get(MetaModel.class),
                             initMapByEntries(mapParts).build(), PRIVATE, FINAL))
                     .addMethod(methodBuilder("of")
                             .addModifiers(PUBLIC)
