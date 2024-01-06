@@ -15,14 +15,14 @@ import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
-import static javax.tools.Diagnostic.Kind.WARNING;
+import static javax.tools.Diagnostic.Kind.*;
 
 @UtilityClass
 public class MetaBeanUtils {
 
     public static final String METAS = "Metas";
 
-    public static MetaBean getBean(Messager messager, TypeElement type, DeclaredType declaredType) {
+    public static MetaBean getBean(Messager messager, TypeElement type, DeclaredType declaredType, Meta meta) {
         if (type == null || isObjectType(type)) {
             return null;
         }
@@ -31,7 +31,6 @@ public class MetaBeanUtils {
 
         var isRecord = type.getRecordComponents() != null;
         var annotations = type.getAnnotationMirrors();
-        var meta = type.getAnnotation(Meta.class);
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
         var nestedTypes = new LinkedHashMap<String, MetaBean>();
@@ -93,7 +92,7 @@ public class MetaBeanUtils {
                 property.setField(ve);
                 updateType(property, propType, typeParameters);
             } else if (enclosedElement instanceof TypeElement te && enclosedElement.getAnnotation(Meta.class) != null) {
-                var nestedBean = getBean(messager, te, null);
+                var nestedBean = getBean(messager, te, null, meta);
                 var nestedBeanClassName = nestedBean.getClassName();
                 var exists = nestedTypes.get(nestedBeanClassName);
                 if (exists == null) {
@@ -113,11 +112,11 @@ public class MetaBeanUtils {
         }
 
         var superBean = ofNullable(getTypeInfo(type.getSuperclass())).map(superclass ->
-                getBean(messager, superclass.typeElement, superclass.declaredType)
+                getBean(messager, superclass.typeElement, superclass.declaredType, meta)
         ).orElse(null);
 
         var interfaceBeans = type.getInterfaces().stream().map(MetaBeanUtils::getTypeInfo)
-                .filter(Objects::nonNull).map(iface -> getBean(messager, iface.typeElement, iface.declaredType))
+                .filter(Objects::nonNull).map(iface -> getBean(messager, iface.typeElement, iface.declaredType, meta))
                 .toList();
 
         var name = type.getSimpleName().toString();
@@ -125,7 +124,8 @@ public class MetaBeanUtils {
         var builder = ofNullable(meta).map(Meta::builder);
         var superBuilderInfo = superBean != null ? superBean.getBeanBuilderInfo() : null;
         var beanBuilder = builder.map(Meta.Builder::detect).orElse(false)
-                ? newBeanBuilder(messager, type, typeParameters, builder.map(Meta.Builder::className).orElse(Meta.Builder.CLASS_NAME), superBuilderInfo) : null;
+                ? newBeanBuilder(messager, type, typeParameters,
+                builder.map(Meta.Builder::className).orElse(Meta.Builder.CLASS_NAME), superBuilderInfo) : null;
 
         return MetaBean.builder()
                 .isRecord(isRecord)
@@ -293,12 +293,19 @@ public class MetaBeanUtils {
             if (builderType == null) {
                 messager.printMessage(WARNING, "cannot determine builder class '" + builderClassName + "'", beanType);
                 return null;
+            } else if (builderType.asType().getKind() == TypeKind.ERROR) {
+                messager.printMessage(WARNING, "invalid builder class '" + builderClassName + "'", beanType);
+                return null;
             } else {
+
                 var builderMethodName = getAnnotationValue("builderMethodName", values, defaultValues);
                 var buildMethodName = getAnnotationValue("buildMethodName", values, defaultValues);
                 var setterPrefix = getAnnotationValue("setterPrefix", values, defaultValues);
 
-                var setters = getBuilderSetters(builderType, isInheritor ? superBuilder : null);
+//                messager.printMessage(NOTE, "detect builder class '" + builderClassName +
+//                        "', annotation '" + builderAnnotation + "', for '" + beanType + "'");
+
+                var setters = getBuilderSetters(messager, builderType, isInheritor ? superBuilder : null);
 
                 return BeanBuilder.builder()
                         .metaClassName(metaClassName)
@@ -315,7 +322,8 @@ public class MetaBeanUtils {
         return null;
     }
 
-    private static ArrayList<BeanBuilder.Setter> getBuilderSetters(TypeElement typeElement, BeanBuilder superBuilder) {
+    private static ArrayList<BeanBuilder.Setter> getBuilderSetters(
+            Messager messager, TypeElement typeElement, BeanBuilder superBuilder) {
         var setters = new ArrayList<BeanBuilder.Setter>();
         var builderType = typeElement.asType();
         var element = typeElement;
@@ -323,6 +331,7 @@ public class MetaBeanUtils {
         while (element != null && !isObjectType(element)) {
             var typeParameters = extractGenericParams(element, declaredType);
             var builderElements = element.getEnclosedElements();
+//            messager.printMessage(OTHER, "builderElements size " + builderElements.size() + ", for " + element + ", kind " + element.asType().getKind() + ", root element " + typeElement);
             for (var enclosedElement : builderElements) {
                 var modifiers = enclosedElement.getModifiers();
                 var isPublic = modifiers.contains(PUBLIC);
@@ -342,23 +351,30 @@ public class MetaBeanUtils {
             }
             if (element.getSuperclass() instanceof DeclaredType dt) {
                 if (dt.asElement() instanceof TypeElement te) {
-                    if (superBuilder != null && dt.getKind() == TypeKind.ERROR) {
+                    if (dt.getKind() == TypeKind.ERROR) {
                         //actual to the Lombok @SuperBuilder
-                        var typeArguments = dt.getTypeArguments();
+                        messager.printMessage(WARNING, "builder superclass is invalid, builder '" + element +
+                                "', superlcass '" + te + "', superbuilder info " + superBuilder);
+                        if (superBuilder != null) {
+                            var typeArguments = dt.getTypeArguments();
 
-                        var superBuilderType = superBuilder.getType();
-                        var superParameters = superBuilderType.getTypeParameters();
-                        var actualizedSuperSetters = superBuilder.getSetters().stream().map(setter -> {
-                            if (setter.getType() instanceof TypeVariable typeVariable) {
-                                var i = getIndex(typeVariable.asElement(), superParameters);
-                                var typeMirror = i >= 0 && i < typeArguments.size() ? typeArguments.get(i) : null;
-                                return typeMirror != null ? setter.toBuilder().evaluatedType(typeMirror).build() : setter;
-                            }
-                            return setter;
-                        }).toList();
-                        setters.addAll(actualizedSuperSetters);
-                        element = null;
-                        declaredType = null;
+                            var superBuilderType = superBuilder.getType();
+                            var superParameters = superBuilderType.getTypeParameters();
+                            var actualizedSuperSetters = superBuilder.getSetters().stream().map(setter -> {
+                                if (setter.getType() instanceof TypeVariable typeVariable) {
+                                    var i = getIndex(typeVariable.asElement(), superParameters);
+                                    var typeMirror = i >= 0 && i < typeArguments.size() ? typeArguments.get(i) : null;
+                                    return typeMirror != null ? setter.toBuilder().evaluatedType(typeMirror).build() : setter;
+                                }
+                                return setter;
+                            }).toList();
+                            setters.addAll(actualizedSuperSetters);
+                            element = null;
+                            declaredType = null;
+                        } else {
+                            element = te;
+                            declaredType = dt;
+                        }
                     } else {
                         element = te;
                         declaredType = dt;

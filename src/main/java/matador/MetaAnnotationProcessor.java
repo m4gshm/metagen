@@ -7,7 +7,6 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
@@ -17,13 +16,14 @@ import java.util.*;
 import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
+import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
 import static matador.JavaPoetUtils.initMapByEntries;
 import static matador.MetaBeanUtils.getAggregatorName;
 import static matador.MetaBeanUtils.getBean;
 
 @SupportedAnnotationTypes("matador.Meta")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
+@SupportedSourceVersion(RELEASE_17)
 public class MetaAnnotationProcessor extends AbstractProcessor {
 
     @Override
@@ -33,7 +33,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
         var beans = elements.stream()
                 .map(e -> e instanceof TypeElement type ? type : null).filter(Objects::nonNull)
                 .filter(type -> type.getEnclosingElement() instanceof PackageElement)
-                .map(type -> getBean(this.processingEnv.getMessager(), type, null)).toList();
+                .map(type -> getBean(this.processingEnv.getMessager(), type, null, type.getAnnotation(Meta.class))).toList();
 
         record AggregatorParts(String package_, String name, List<String> mapParts) {
 

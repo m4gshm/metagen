@@ -1,7 +1,6 @@
 package matador;
 
 import io.jbock.javapoet.*;
-import org.jetbrains.annotations.NotNull;
 
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
@@ -389,7 +388,6 @@ public class JavaPoetUtils {
         return CodeBlock.builder().add("new $T<>($L)", className, args).build();
     }
 
-    @NotNull
     private static CodeBlock enumConstructorArgs(String name, String type, CodeBlock getter, CodeBlock setter) {
         var builder = enumConstructorArgs(name, type).toBuilder();
         if (getter != null) {
@@ -401,7 +399,6 @@ public class JavaPoetUtils {
         return builder.build();
     }
 
-    @NotNull
     private static CodeBlock enumConstructorArgs(String name, String type) {
         return CodeBlock.builder().add("\"" + name + "\"").add(", ").add(type).build();
     }
@@ -442,7 +439,6 @@ public class JavaPoetUtils {
         return typesBuilder.build();
     }
 
-    @NotNull
     private static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder fieldsClassBuilder, String nameFieldName, String typeFieldName,
                                                            ClassName nameArgType, ParameterizedTypeName typeArgType) {
         return fieldsClassBuilder
@@ -496,17 +492,14 @@ public class JavaPoetUtils {
         );
     }
 
-    @NotNull
     private static ParameterizedTypeName getFunctionType(ClassName beanType, TypeVariableName propertyTypeVar) {
         return ParameterizedTypeName.get(ClassName.get(Function.class), beanType, propertyTypeVar);
     }
 
-    @NotNull
     private static ParameterizedTypeName getBiConsumerType(ClassName beanType, TypeVariableName propertyTypeVar) {
         return ParameterizedTypeName.get(ClassName.get(BiConsumer.class), beanType, propertyTypeVar);
     }
 
-    @NotNull
     private static TypeSpec.Builder typeAwareClass(ClassName className, TypeVariableName typeVariable) {
         return classBuilder(className)
                 .addTypeVariable(typeVariable)
@@ -543,7 +536,6 @@ public class JavaPoetUtils {
         return builder;
     }
 
-    @NotNull
     private static ParameterizedTypeName writeInterface(ClassName beanType, TypeVariableName typeVariable) {
         return ParameterizedTypeName.get(ClassName.get(Write.class), beanType, typeVariable);
     }
@@ -606,7 +598,6 @@ public class JavaPoetUtils {
         return builder.build();
     }
 
-    @NotNull
     private static TypeSpec.Builder addValues(
             TypeSpec.Builder builder, ClassName typeName, Collection<String> propertyNames, Set<String> uniqueNames
     ) {
@@ -639,7 +630,6 @@ public class JavaPoetUtils {
         mapInitializer.add(mapEntry(mapKey + ".class", mapValue)).unindent();
     }
 
-    @NotNull
     public static CodeBlock mapEntry(String mapKey, String mapValue) {
         return CodeBlock.builder().add(
                 "$T.entry($L, $L)",
@@ -669,7 +659,6 @@ public class JavaPoetUtils {
         return (setter != null || field != null) && property.getRecordComponent() == null;
     }
 
-    @NotNull
     private static FieldSpec newPropertyConstant(ClassName beanType, MetaBean.Property property, ClassName constType) {
         var name = property.getName();
         var type = property.getEvaluatedType();
@@ -680,7 +669,6 @@ public class JavaPoetUtils {
         return newPropertyConstant(beanType, type, constType, name, field, getter, setter, record);
     }
 
-    @NotNull
     private static FieldSpec newPropertyConstant(ClassName beanType, TypeMirror propertyType,
                                                  ClassName constType, String constName,
                                                  VariableElement field, ExecutableElement getter,
@@ -718,21 +706,18 @@ public class JavaPoetUtils {
         return type.isPrimitive() ? type.box() : type;
     }
 
-    @NotNull
     static FieldSpec listField(String name, TypeName type, CodeBlock init, Modifier... modifiers) {
         return builder(ParameterizedTypeName.get(ClassName.get(List.class), type), name, modifiers)
                 .initializer(CodeBlock.builder().add("$T.of($L)", List.class, init).build())
                 .build();
     }
 
-    @NotNull
     static FieldSpec mapField(String name, ClassName key, ClassName value, CodeBlock init, Modifier... modifiers) {
         return builder(
                 ParameterizedTypeName.get(ClassName.get(Map.class), key, value), name, modifiers
         ).initializer(init).build();
     }
 
-    @NotNull
     public static CodeBlock.Builder initMapByEntries(List<String> entries) {
         var init = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
         for (int i = 0; i < entries.size(); i++) {

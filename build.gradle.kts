@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm")
+//    kotlin("jvm")
     `java-library`
     `maven-publish`
 }
@@ -24,16 +24,19 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-    implementation(kotlin("stdlib-jdk8"))
+//    implementation(kotlin("stdlib-jdk8"))
 }
 
 tasks.test {
     useJUnitPlatform()
 }
 
-kotlin {
-    jvmToolchain(17)
+tasks.compileJava {
+    this.options.isVerbose = true
 }
+//kotlin {
+//    jvmToolchain(17)
+//}
 
 java {
     withSourcesJar()
