@@ -10,7 +10,6 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 @Target({TYPE, PACKAGE})
 @Retention(SOURCE)
 public @interface Meta {
-
     String META = "Meta";
 
     String suffix() default META;
@@ -21,9 +20,10 @@ public @interface Meta {
 
     Builder builder() default @Builder();
 
+    boolean aggregate() default true;
+
     @Retention(SOURCE)
     @interface Properties {
-
         String METHOD_NAME = "properties";
         String CLASS_NAME = "Prop";
 
@@ -36,7 +36,6 @@ public @interface Meta {
 
     @Retention(SOURCE)
     @interface Parameters {
-
         String METHOD_NAME = "parameters";
         String CLASS_NAME = "Param";
 
@@ -50,14 +49,12 @@ public @interface Meta {
 
         @Retention(SOURCE)
         @interface Inherited {
-
             Super parentClass() default @Super;
 
             Interfaces interfaces() default @Interfaces;
 
             @Retention(SOURCE)
             @interface Super {
-
                 String METHOD_NAME = "superParameters";
                 String CLASS_NAME_SUFFIX = "Param";
 
@@ -70,7 +67,6 @@ public @interface Meta {
 
             @Retention(SOURCE)
             @interface Interfaces {
-
                 String METHOD_NAME = "parametersOf";
                 String CLASS_NAME_SUFFIX = "Param";
 
@@ -95,5 +91,4 @@ public @interface Meta {
 
         boolean detect() default false;
     }
-
 }

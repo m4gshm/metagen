@@ -6,34 +6,24 @@ import lombok.Data;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
-import java.util.Set;
-
-import static matador.MetaBeanUtils.getPackage;
 
 @Data
 @Builder(toBuilder = true)
 public class MetaBean {
     private TypeElement type;
     private String name;
-    private String className;
-    private Set<Modifier> modifiers;
+    private String packageName;
     private List<Property> properties;
     private List<Param> typeParameters;
     private MetaBean superclass;
-    private List<MetaBean> nestedTypes;
+    private List<TypeElement> nestedTypes;
     private List<MetaBean> interfaces;
     private boolean isRecord;
     private Meta meta;
     private BeanBuilder beanBuilderInfo;
-    private List<? extends AnnotationMirror> annotations;
 
     public String getClassName() {
-        return className != null ? className : type.getSimpleName().toString();
-    }
-
-    public String getPackageName() {
-        var packageElement = getPackage(type);
-        return packageElement != null ? packageElement.getQualifiedName().toString() : null;
+        return type.getSimpleName().toString();
     }
 
     @Data
@@ -47,6 +37,7 @@ public class MetaBean {
         private TypeElement type;
         private List<Param> typeParameters;
         private List<Setter> setters;
+
         @Data
         @Builder(toBuilder = true)
         public static final class Setter {

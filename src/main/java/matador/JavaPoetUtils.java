@@ -19,7 +19,7 @@ import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.*;
 
 public class JavaPoetUtils {
-    public static TypeSpec newTypeBean(MetaBean bean, Modifier... modifiers) {
+    public static TypeSpec.Builder newTypeBuilder(MetaBean bean, Modifier... modifiers) {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
@@ -99,7 +99,7 @@ public class JavaPoetUtils {
                 );
                 addInheritedParams(
                         inheritedParamsFieldInitializer,
-                        ClassName.get(superclass.getPackageName(), superclass.getClassName()),
+                        ClassName.get(superclass.getType()),
                         superTypeName, true
                 );
             }
@@ -112,7 +112,11 @@ public class JavaPoetUtils {
                             iface.getClassName() + interfacesParams.classNameSuffix(), uniqueNames
                     );
                     builder.addType(newEnumParams(ifaceParametersEnumName, iface.getTypeParameters()));
-                    addInheritedParams(inheritedParamsFieldInitializer, ClassName.get(iface.getPackageName(), iface.getClassName()), ifaceParametersEnumName, addSuperParams || i > 0);
+                    addInheritedParams(
+                            inheritedParamsFieldInitializer,
+                            ClassName.get(iface.getType()),
+                            ifaceParametersEnumName,
+                            addSuperParams || i > 0);
                 }
                 inheritedParamsField.initializer(inheritedParamsFieldInitializer.add("\n)").build());
                 builder.addField(inheritedParamsField.build());
@@ -358,7 +362,7 @@ public class JavaPoetUtils {
             builder.addSuperinterface(ClassName.get(SuperParametersAware.class));
         }
 
-        var srcModifiers = ofNullable(bean.getModifiers()).orElse(Set.of());
+        var srcModifiers = ofNullable(bean.getType().getModifiers()).orElse(Set.of());
         var accessLevel = srcModifiers.contains(PRIVATE) ? PRIVATE
                 : srcModifiers.contains(PROTECTED) ? PROTECTED
                 : srcModifiers.contains(PUBLIC) ? PUBLIC : null;
@@ -366,22 +370,22 @@ public class JavaPoetUtils {
             builder.addModifiers(accessLevel);
         }
 
-        var nestedTypes = ofNullable(bean.getNestedTypes()).orElse(List.of());
-        for (var nestedBean : nestedTypes) {
-            var beanClassName = nestedBean.getClassName();
-            var nestedName = getUniqueName(beanClassName, uniqueNames);
-            if (!beanClassName.equals(nestedName)) {
-                nestedBean = nestedBean.toBuilder().className(nestedName).build();
-            }
-            builder.addType(newTypeBean(nestedBean, STATIC));
-        }
+//        var nestedTypes = ofNullable(bean.getNestedTypes()).orElse(List.of());
+//        for (var nestedBean : nestedTypes) {
+//            var beanClassName = nestedBean.getClassName();
+//            var nestedName = getUniqueName(beanClassName, uniqueNames);
+//            if (!beanClassName.equals(nestedName)) {
+//                nestedBean = nestedBean.toBuilder().className(nestedName).build();
+//            }
+//            builder.addType(newTypeBuilder(nestedBean, STATIC).build());
+//        }
 
         var beanBuilderInfo = bean.getBeanBuilderInfo();
         if (beanBuilderInfo != null) {
             builder.addType(newBuilderType(beanBuilderInfo));
         }
 
-        return builder.build();
+        return builder;
     }
 
     static CodeBlock newInstanceCall(TypeName className, CodeBlock args) {
@@ -720,12 +724,12 @@ public class JavaPoetUtils {
 
     public static CodeBlock.Builder initMapByEntries(List<String> entries) {
         var init = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
-        for (int i = 0; i < entries.size(); i++) {
+        for (var i = 0; i < entries.size(); i++) {
             var mapPart = entries.get(i);
             if (i > 0) {
                 init.add(",\n");
             }
-            init.add(mapPart);
+            init.add(CodeBlock.builder().indent().add(mapPart).unindent().build());
         }
         init.add("\n)");
         return init;

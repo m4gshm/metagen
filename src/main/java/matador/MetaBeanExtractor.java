@@ -1,6 +1,6 @@
 package matador;
 
-import lombok.experimental.UtilityClass;
+import lombok.RequiredArgsConstructor;
 import matador.MetaBean.BeanBuilder;
 
 import javax.annotation.processing.Messager;
@@ -15,133 +15,14 @@ import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
-import static javax.tools.Diagnostic.Kind.*;
+import static javax.tools.Diagnostic.Kind.WARNING;
 
-@UtilityClass
-public class MetaBeanUtils {
+@RequiredArgsConstructor
+public class MetaBeanExtractor {
 
     public static final String METAS = "Metas";
 
-    public static MetaBean getBean(Messager messager, TypeElement type, DeclaredType declaredType, Meta meta) {
-        if (type == null || isObjectType(type)) {
-            return null;
-        }
-
-        var typeParameters = extractGenericParams(type, declaredType);
-
-        var isRecord = type.getRecordComponents() != null;
-        var annotations = type.getAnnotationMirrors();
-
-        var properties = new LinkedHashMap<String, MetaBean.Property>();
-        var nestedTypes = new LinkedHashMap<String, MetaBean>();
-        var recordComponents = type.getRecordComponents();
-        if (recordComponents != null) {
-            for (var recordComponent : recordComponents) {
-                var recordName = recordComponent.getSimpleName();
-                var propType = recordComponent.asType();
-                var annotationMirrors = recordComponent.getAnnotationMirrors();
-                var property = getProperty(properties, recordName.toString(), annotationMirrors);
-                property.setRecordComponent(recordComponent);
-                updateType(property, propType, typeParameters);
-            }
-        }
-        var enclosedElements = type.getEnclosedElements();
-        for (var enclosedElement : enclosedElements) {
-            var annotationMirrors = enclosedElement.getAnnotationMirrors();
-            var modifiers = enclosedElement.getModifiers();
-            var isPublic = modifiers.contains(PUBLIC);
-            var isStatic = modifiers.contains(STATIC);
-            if (!isStatic && isPublic && enclosedElement instanceof ExecutableElement ee) {
-                var getter = isGetter(ee);
-                var setter = isSetter(ee);
-                var boolGetter = isBoolGetter(ee);
-                var propName = getter ? getPropertyName("get", ee)
-                        : boolGetter ? getPropertyName("is", ee)
-                        : setter ? getPropertyName("set", ee) : null;
-                if (propName != null) {
-                    final TypeMirror propType;
-                    if (getter || boolGetter) {
-                        propType = ee.getReturnType();
-                    } else {
-                        var parameters = ee.getParameters();
-                        if (parameters.size() == 1) {
-                            var element = parameters.get(0);
-                            propType = element.asType();
-                        } else if (parameters.size() == 2) {
-                            var first = parameters.get(0);
-                            var isIndex = first.asType() instanceof PrimitiveType primitiveType
-                                    && "int".equals(primitiveType.toString());
-                            propType = isIndex ? parameters.get(1).asType() : null;
-                        } else {
-                            propType = null;
-                        }
-                    }
-
-                    var property = getProperty(properties, propName, annotationMirrors);
-                    if (setter) {
-                        property.setSetter(ee);
-                    }
-                    if (getter || boolGetter) {
-                        property.setGetter(ee);
-                    }
-                    updateType(property, propType, typeParameters);
-                }
-            } else if (!isStatic && isPublic && enclosedElement instanceof VariableElement ve) {
-                var propType = ve.asType();
-                var property = getProperty(properties, ve.getSimpleName().toString(), annotationMirrors);
-                property.setField(ve);
-                updateType(property, propType, typeParameters);
-            } else if (enclosedElement instanceof TypeElement te && enclosedElement.getAnnotation(Meta.class) != null) {
-                var nestedBean = getBean(messager, te, null, meta);
-                var nestedBeanClassName = nestedBean.getClassName();
-                var exists = nestedTypes.get(nestedBeanClassName);
-                if (exists == null) {
-                    nestedTypes.put(nestedBeanClassName, nestedBean);
-                } else {
-                    //todo
-//                    var parentBeanTypes = getParentBean(nestedTypes, typeName).getNestedTypes();
-//                    var nestedOfParent = parentBeanTypes.get(nestedBeanClassName);
-//                    if (nestedOfParent == null) {
-//                        parentBeanTypes.put(nestedBeanClassName, bean);
-//                    } else {
-//                        messager.printNote("nested class already handled, '" + nestedBeanClassName + "' " +
-//                                nestedOfParent + ", parent '" + typeName + "'", type);
-//                    }
-                }
-            }
-        }
-
-        var superBean = ofNullable(getTypeInfo(type.getSuperclass())).map(superclass ->
-                getBean(messager, superclass.typeElement, superclass.declaredType, meta)
-        ).orElse(null);
-
-        var interfaceBeans = type.getInterfaces().stream().map(MetaBeanUtils::getTypeInfo)
-                .filter(Objects::nonNull).map(iface -> getBean(messager, iface.typeElement, iface.declaredType, meta))
-                .toList();
-
-        var name = type.getSimpleName().toString();
-        var suffix = ofNullable(meta).map(Meta::suffix).map(String::trim).filter(m -> !m.isEmpty()).orElse(Meta.META);
-        var builder = ofNullable(meta).map(Meta::builder);
-        var superBuilderInfo = superBean != null ? superBean.getBeanBuilderInfo() : null;
-        var beanBuilder = builder.map(Meta.Builder::detect).orElse(false)
-                ? newBeanBuilder(messager, type, typeParameters,
-                builder.map(Meta.Builder::className).orElse(Meta.Builder.CLASS_NAME), superBuilderInfo) : null;
-
-        return MetaBean.builder()
-                .isRecord(isRecord)
-                .type(type)
-                .meta(meta)
-                .name(name + suffix)
-                .superclass(superBean)
-                .interfaces(interfaceBeans)
-                .nestedTypes(new ArrayList<>(nestedTypes.values()))
-                .properties(new ArrayList<>(properties.values()))
-                .modifiers(type.getModifiers())
-                .typeParameters(typeParameters)
-                .annotations(annotations)
-                .beanBuilderInfo(beanBuilder)
-                .build();
-    }
+    private final Messager messager;
 
     static boolean isBoolGetter(ExecutableElement executableElement) {
         var name = getMethodName(executableElement);
@@ -180,6 +61,11 @@ public class MetaBeanUtils {
         return (PackageElement) enclosingElement;
     }
 
+    static TypeElement getExternalClass(TypeElement type) {
+        var enclosingElement = type.getEnclosingElement();
+        return enclosingElement instanceof TypeElement te ? te : null;
+    }
+
     static TypeInfo getTypeInfo(TypeMirror typeMirror) {
         return typeMirror instanceof DeclaredType declaredType
                 && declaredType.asElement() instanceof TypeElement typeElement
@@ -208,10 +94,8 @@ public class MetaBeanUtils {
         var existType = property.getType();
         if (existType == null) {
             property.setType(propType);
-            property.setEvaluatedType(evalType(propType, beanParameters));
-        } else if (!existType.equals(propType)) {
-            //todo set Object or shared parent type
-//            property.setType(null);
+            var evaluatedType = evalType(propType, beanParameters);
+            property.setEvaluatedType(evaluatedType);
         }
     }
 
@@ -357,7 +241,6 @@ public class MetaBeanUtils {
                                 "', superlcass '" + te + "', superbuilder info " + superBuilder);
                         if (superBuilder != null) {
                             var typeArguments = dt.getTypeArguments();
-
                             var superBuilderType = superBuilder.getType();
                             var superParameters = superBuilderType.getTypeParameters();
                             var actualizedSuperSetters = superBuilder.getSetters().stream().map(setter -> {
@@ -407,7 +290,143 @@ public class MetaBeanUtils {
         return ofNullable(values.getOrDefault(attributeName, defaultValues.get(attributeName))).map(Object::toString).orElse("");
     }
 
-    record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {
+    public MetaBean getBean(TypeElement type) {
+        return getBean(type, null, type.getAnnotation(Meta.class));
+    }
 
+    private MetaBean getBean(TypeElement type, DeclaredType declaredType, Meta meta) {
+        if (type == null || isObjectType(type)) {
+            return null;
+        }
+
+        var typeParameters = extractGenericParams(type, declaredType);
+
+        var isRecord = type.getRecordComponents() != null;
+
+        var properties = new LinkedHashMap<String, MetaBean.Property>();
+//        var nestedTypes = new LinkedHashMap<String, MetaBean>();
+        var nestedTypes = new ArrayList<TypeElement>();
+        var recordComponents = type.getRecordComponents();
+        if (recordComponents != null) {
+            for (var recordComponent : recordComponents) {
+                var recordName = recordComponent.getSimpleName();
+                var propType = recordComponent.asType();
+                var annotationMirrors = recordComponent.getAnnotationMirrors();
+                var property = getProperty(properties, recordName.toString(), annotationMirrors);
+                property.setRecordComponent(recordComponent);
+                updateType(property, propType, typeParameters);
+            }
+        }
+        var enclosedElements = type.getEnclosedElements();
+        for (var enclosedElement : enclosedElements) {
+            var annotationMirrors = enclosedElement.getAnnotationMirrors();
+            var modifiers = enclosedElement.getModifiers();
+            var isPublic = modifiers.contains(PUBLIC);
+            var isStatic = modifiers.contains(STATIC);
+            if (!isStatic && isPublic && enclosedElement instanceof ExecutableElement ee) {
+                var getter = isGetter(ee);
+                var setter = isSetter(ee);
+                var boolGetter = isBoolGetter(ee);
+                var propName = getter ? getPropertyName("get", ee)
+                        : boolGetter ? getPropertyName("is", ee)
+                        : setter ? getPropertyName("set", ee) : null;
+                if (propName != null) {
+                    final TypeMirror propType;
+                    if (getter || boolGetter) {
+                        propType = ee.getReturnType();
+                    } else {
+                        var parameters = ee.getParameters();
+                        if (parameters.size() == 1) {
+                            var element = parameters.get(0);
+                            propType = element.asType();
+                        } else if (parameters.size() == 2) {
+                            var first = parameters.get(0);
+                            var isIndex = first.asType() instanceof PrimitiveType primitiveType
+                                    && "int".equals(primitiveType.toString());
+                            propType = isIndex ? parameters.get(1).asType() : null;
+                        } else {
+                            propType = null;
+                        }
+                    }
+
+                    var property = getProperty(properties, propName, annotationMirrors);
+                    if (setter) {
+                        property.setSetter(ee);
+                    }
+                    if (getter || boolGetter) {
+                        property.setGetter(ee);
+                    }
+                    updateType(property, propType, typeParameters);
+                }
+            } else if (!isStatic && isPublic && enclosedElement instanceof VariableElement ve) {
+                var propType = ve.asType();
+                var property = getProperty(properties, ve.getSimpleName().toString(), annotationMirrors);
+                property.setField(ve);
+                updateType(property, propType, typeParameters);
+            } else if (enclosedElement instanceof TypeElement te) {
+                nestedTypes.add(te);
+//                var enclosedMeta = enclosedElement.getAnnotation(Meta.class);
+//                if (enclosedMeta != null) {
+//                    var nestedBean = getBean(te, null, enclosedMeta);
+//                    nestedTypes.putIfAbsent(nestedBean.getClassName(), nestedBean);
+//                }
+            }
+        }
+
+        var superBean = ofNullable(getTypeInfo(type.getSuperclass())).map(superclass ->
+                getBean(superclass.typeElement, superclass.declaredType, meta)
+        ).orElse(null);
+
+        var interfaceBeans = type.getInterfaces().stream().map(MetaBeanExtractor::getTypeInfo)
+                .filter(Objects::nonNull).map(iface -> getBean(iface.typeElement, iface.declaredType, meta))
+                .toList();
+
+        var name = type.getSimpleName().toString();
+
+        var owner = type.getEnclosingElement();
+        var beanPackage = "";
+        StringBuilder prefix = new StringBuilder();
+        if (owner instanceof PackageElement packageElement) {
+            beanPackage = packageElement.getQualifiedName().toString();
+        } else if (owner instanceof TypeElement externalClass) {
+            prefix = new StringBuilder(externalClass.getSimpleName().toString());
+            TypeElement superExternalClass;
+            while (null != (superExternalClass = getExternalClass(externalClass))) {
+                prefix.insert(0, superExternalClass.getSimpleName().toString());
+                externalClass = superExternalClass;
+            }
+
+            if (externalClass.getEnclosingElement() instanceof PackageElement packageElement) {
+                beanPackage = packageElement.getQualifiedName().toString();
+            }
+        }
+
+        var suffix = ofNullable(meta).map(Meta::suffix).map(String::trim).filter(m -> !m.isEmpty()).orElse(Meta.META);
+        var builder = ofNullable(meta).map(Meta::builder);
+        var superBuilderInfo = superBean != null ? superBean.getBeanBuilderInfo() : null;
+        var beanBuilder = builder.map(Meta.Builder::detect).orElse(false)
+                ? newBeanBuilder(messager, type, typeParameters,
+                builder.map(Meta.Builder::className).orElse(Meta.Builder.CLASS_NAME), superBuilderInfo) : null;
+
+        return MetaBean.builder()
+                .isRecord(isRecord)
+                .type(type)
+                .meta(meta)
+                .name(prefix + name + suffix)
+                .packageName(beanPackage)
+                .superclass(superBean)
+                .interfaces(interfaceBeans)
+                .nestedTypes(nestedTypes)
+//                .nestedTypes(new ArrayList<>(nestedTypes.values()))
+                .properties(new ArrayList<>(properties.values()))
+                .typeParameters(typeParameters)
+                .beanBuilderInfo(beanBuilder)
+                .build();
+    }
+
+    record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {
+        public TypeInfo(TypeElement typeElement) {
+            this(null, typeElement);
+        }
     }
 }
