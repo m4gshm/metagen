@@ -47,18 +47,8 @@ public class MetaBeanExtractor {
         return decapitalize(getMethodName(ee).substring(prefix.length()));
     }
 
-    static MetaBean.Property getProperty(Map<String, MetaBean.Property> properties, String propName,
-                                         List<? extends AnnotationMirror> annotations) {
-        return properties.computeIfAbsent(propName, name -> MetaBean.Property.builder().name(name)
-                .annotations(annotations).build());
-    }
-
-    static PackageElement getPackage(TypeElement type) {
-        var enclosingElement = type.getEnclosingElement();
-        while (!(enclosingElement instanceof PackageElement) && enclosingElement != null) {
-            enclosingElement = enclosingElement.getEnclosingElement();
-        }
-        return (PackageElement) enclosingElement;
+    static MetaBean.Property getProperty(Map<String, MetaBean.Property> properties, String propName) {
+        return properties.computeIfAbsent(propName, name -> MetaBean.Property.builder().name(name).build());
     }
 
     static TypeElement getExternalClass(TypeElement type) {
@@ -90,13 +80,22 @@ public class MetaBeanExtractor {
         return params;
     }
 
-    static void updateType(MetaBean.Property property, TypeMirror propType, List<MetaBean.Param> beanParameters) {
+    static void updateType(MetaBean.Property property, TypeMirror propType,
+                           List<MetaBean.Param> beanParameters,
+                           List<? extends AnnotationMirror> annotations) {
         var existType = property.getType();
         if (existType == null) {
             property.setType(propType);
             var evaluatedType = evalType(propType, beanParameters);
             property.setEvaluatedType(evaluatedType);
         }
+        var propAnnotations = property.getAnnotations();
+        if (propAnnotations == null) {
+            propAnnotations = new ArrayList<>(annotations);
+        } else {
+            propAnnotations.addAll(annotations);
+        }
+        property.setAnnotations(propAnnotations);
     }
 
     static boolean isObjectType(TypeElement type) {
@@ -120,7 +119,7 @@ public class MetaBeanExtractor {
 
     private static TypeMirror evalType(TypeVariable typeVariable, List<MetaBean.Param> beanParameters) {
         var collect = beanParameters != null
-                ? beanParameters.stream().collect(toMap(p -> p.getName().asType(), p -> p.getType()))
+                ? beanParameters.stream().collect(toMap(p -> p.getName().asType(), MetaBean.Param::getType))
                 : Map.<TypeMirror, TypeMirror>of();
         var type = collect.get(typeVariable);
         if (type != null && !type.equals(typeVariable)) {
@@ -312,9 +311,9 @@ public class MetaBeanExtractor {
                 var recordName = recordComponent.getSimpleName();
                 var propType = recordComponent.asType();
                 var annotationMirrors = recordComponent.getAnnotationMirrors();
-                var property = getProperty(properties, recordName.toString(), annotationMirrors);
+                var property = getProperty(properties, recordName.toString());
                 property.setRecordComponent(recordComponent);
-                updateType(property, propType, typeParameters);
+                updateType(property, propType, typeParameters, annotationMirrors);
             }
         }
         var enclosedElements = type.getEnclosedElements();
@@ -349,20 +348,22 @@ public class MetaBeanExtractor {
                         }
                     }
 
-                    var property = getProperty(properties, propName, annotationMirrors);
+                    var property = getProperty(properties, propName);
                     if (setter) {
                         property.setSetter(ee);
                     }
                     if (getter || boolGetter) {
                         property.setGetter(ee);
                     }
-                    updateType(property, propType, typeParameters);
+                    updateType(property, propType, typeParameters, annotationMirrors);
                 }
-            } else if (!isStatic && isPublic && enclosedElement instanceof VariableElement ve) {
+            } else if (!isStatic && enclosedElement instanceof VariableElement ve) {
                 var propType = ve.asType();
-                var property = getProperty(properties, ve.getSimpleName().toString(), annotationMirrors);
+                var propName = ve.getSimpleName().toString();
+                var property = getProperty(properties, propName);
                 property.setField(ve);
-                updateType(property, propType, typeParameters);
+                property.setPublicField(isPublic);
+                updateType(property, propType, typeParameters, annotationMirrors);
             } else if (enclosedElement instanceof TypeElement te) {
                 nestedTypes.add(te);
 //                var enclosedMeta = enclosedElement.getAnnotation(Meta.class);

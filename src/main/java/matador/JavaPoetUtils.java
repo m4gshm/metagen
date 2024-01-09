@@ -2,6 +2,7 @@ package matador;
 
 import io.jbock.javapoet.*;
 
+import javax.annotation.processing.Messager;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.RecordComponentElement;
@@ -19,7 +20,7 @@ import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.*;
 
 public class JavaPoetUtils {
-    public static TypeSpec.Builder newTypeBuilder(MetaBean bean, Modifier... modifiers) {
+    public static TypeSpec.Builder newTypeBuilder(Messager messager, MetaBean bean, Collection<? extends MetaCustomizer> customizers) {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
@@ -51,7 +52,6 @@ public class JavaPoetUtils {
                 .addMethod(constructorBuilder().build())
                 .addField(instanceField)
                 .addField(typeField)
-                .addModifiers(modifiers)
                 .addModifiers(FINAL);
 
         var uniqueNames = new HashSet<String>();
@@ -140,7 +140,7 @@ public class JavaPoetUtils {
             var propertyPerName = new LinkedHashMap<String, MetaBean.Property>();
             var allReadable = true;
             var allWritable = true;
-            for (var property : bean.getProperties()) {
+            for (var property : bean.getProperties().stream().filter(MetaBean.Property::isPublic).toList()) {
                 var propertyName = property.getName();
                 if (propertyPerName.put(propertyName, property) != null) {
                     throw new IllegalStateException("property already handled, " + propertyName);
@@ -149,7 +149,7 @@ public class JavaPoetUtils {
                 allWritable &= isWriteable(property);
             }
             if (superclass != null) {
-                var superProperties = superclass.getProperties();
+                var superProperties = superclass.getProperties().stream().filter(MetaBean.Property::isPublic).toList();
                 for (var property : superProperties) {
                     var propertyName = property.getName();
                     if (!propertyPerName.containsKey(propertyName)) {
@@ -205,21 +205,21 @@ public class JavaPoetUtils {
             var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
 
             if (rwUsed && !readWriteTypeName.equals(typeName)) {
-                var getterArgName = "getter";
-                var setterArgName = "setter";
-                var getter = getFunctionType(beanType, typeVariable);
-                var setter = getBiConsumerType(beanType, typeVariable);
+                var getterName = "getter";
+                var setterName = "setter";
+                var getterType = getFunctionType(beanType, typeVariable);
+                var setterType = getBiConsumerType(beanType, typeVariable);
 
                 var constructor = constructorBuilder().addModifiers(PRIVATE)
                         .addParameter(nameArgType, "name")
                         .addParameter(typeArgType, "type")
-                        .addParameter(getter, getterArgName)
-                        .addParameter(setter, setterArgName);
+                        .addParameter(getterType, getterName)
+                        .addParameter(setterType, setterName);
 
                 var constructorBody = CodeBlock.builder()
                         .addStatement("super($L, $L)", "name", "type")
-                        .addStatement("this." + getterArgName + " = " + getterArgName)
-                        .addStatement("this." + setterArgName + " = " + setterArgName);
+                        .addStatement("this." + getterName + " = " + getterName)
+                        .addStatement("this." + setterName + " = " + setterName);
 
                 constructor.addCode(constructorBody.build());
 
@@ -229,24 +229,24 @@ public class JavaPoetUtils {
                         .addTypeVariable(typeVariable)
                         .addSuperinterface(readWriteInterface)
                         .addMethod(constructor.build());
-                addGetter(subType, beanType, typeVariable, getter, getterArgName);
-                addSetter(subType, beanType, typeVariable, setter, setterArgName);
+                addGetter(subType, beanType, typeVariable, getterType, getterName);
+                addSetter(subType, beanType, typeVariable, setterType, setterName);
 
                 fieldsClassBuilder.addType(subType.build());
             }
 
             if (readUsed && !readTypeName.equals(typeName)) {
-                var getterArgName = "getter";
-                var getter = getFunctionType(beanType, typeVariable);
+                var getterName = "getter";
+                var getterType = getFunctionType(beanType, typeVariable);
 
                 var constructor = constructorBuilder().addModifiers(PRIVATE)
                         .addParameter(nameArgType, "name")
                         .addParameter(typeArgType, "type")
-                        .addParameter(getter, getterArgName);
+                        .addParameter(getterType, getterName);
 
                 var constructorBody = CodeBlock.builder()
                         .addStatement("super($L, $L)", "name", "type")
-                        .addStatement("this." + getterArgName + " = " + getterArgName);
+                        .addStatement("this." + getterName + " = " + getterName);
 
                 constructor.addCode(constructorBody.build());
 
@@ -257,23 +257,23 @@ public class JavaPoetUtils {
                         .addSuperinterface(readInterface)
                         .addMethod(constructor.build());
 
-                addGetter(subType, beanType, typeVariable, getter, getterArgName);
+                addGetter(subType, beanType, typeVariable, getterType, getterName);
 
                 fieldsClassBuilder.addType(subType.build());
             }
 
             if (writeUsed && !writeTypeName.equals(typeName)) {
-                var setterArgName = "setter";
-                var setter = getBiConsumerType(beanType, typeVariable);
+                var setterName = "setter";
+                var setterType = getBiConsumerType(beanType, typeVariable);
 
                 var constructor = constructorBuilder().addModifiers(PRIVATE)
                         .addParameter(nameArgType, "name")
                         .addParameter(typeArgType, "type")
-                        .addParameter(setter, setterArgName);
+                        .addParameter(setterType, setterName);
 
                 var constructorBody = CodeBlock.builder()
                         .addStatement("super($L, $L)", "name", "type")
-                        .addStatement("this." + setterArgName + " = " + setterArgName);
+                        .addStatement("this." + setterName + " = " + setterName);
 
                 constructor.addCode(constructorBody.build());
 
@@ -284,7 +284,7 @@ public class JavaPoetUtils {
                         .addSuperinterface(writeInterface)
                         .addMethod(constructor.build());
 
-                addSetter(subType, beanType, typeVariable, setter, setterArgName);
+                addSetter(subType, beanType, typeVariable, setterType, setterName);
 
                 fieldsClassBuilder.addType(subType.build());
             }
@@ -294,8 +294,7 @@ public class JavaPoetUtils {
             var nameFieldName = getUniqueName("name", uniqueNames);
             var typeFieldName = getUniqueName("type", uniqueNames);
 
-            fieldsClassBuilder = populateTypeAwareClass(fieldsClassBuilder,
-                    nameFieldName, typeFieldName, nameArgType, typeArgType);
+            populateTypeAwareClass(fieldsClassBuilder, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
             var constructor = constructorBuilder();
             var constructorBody = CodeBlock.builder();
@@ -385,14 +384,18 @@ public class JavaPoetUtils {
             builder.addType(newBuilderType(beanBuilderInfo));
         }
 
+        for (var generator : customizers) {
+            generator.customize(messager, bean, builder);
+        }
+
         return builder;
     }
 
-    static CodeBlock newInstanceCall(TypeName className, CodeBlock args) {
+    public static CodeBlock newInstanceCall(TypeName className, CodeBlock args) {
         return CodeBlock.builder().add("new $T<>($L)", className, args).build();
     }
 
-    private static CodeBlock enumConstructorArgs(String name, String type, CodeBlock getter, CodeBlock setter) {
+    public static CodeBlock enumConstructorArgs(String name, String type, CodeBlock getter, CodeBlock setter) {
         var builder = enumConstructorArgs(name, type).toBuilder();
         if (getter != null) {
             builder.add(", ").add(getter);
@@ -403,11 +406,11 @@ public class JavaPoetUtils {
         return builder.build();
     }
 
-    private static CodeBlock enumConstructorArgs(String name, String type) {
+    public static CodeBlock enumConstructorArgs(String name, String type) {
         return CodeBlock.builder().add("\"" + name + "\"").add(", ").add(type).build();
     }
 
-    static String dotClass(TypeName type) {
+    public static String dotClass(TypeName type) {
         return (type != null ? type : TypeName.OBJECT) + ".class";
     }
 
@@ -424,13 +427,14 @@ public class JavaPoetUtils {
                             getUnboxedTypeVarName(type)), name, PUBLIC, FINAL, STATIC)
                     .initializer(newInstanceCall(className, enumConstructorArgs(name, dotClass(type)))).build());
         }
-        var uniqueNames = new HashSet<String>(paramNames);
+        var uniqueNames = new HashSet<>(paramNames);
 
         var nameFieldName = getUniqueName("name", uniqueNames);
         var typeFieldName = getUniqueName("type", uniqueNames);
         var nameArgType = ClassName.get(String.class);
         var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
-        typesBuilder = populateTypeAwareClass(typesBuilder, nameFieldName, typeFieldName, nameArgType, typeArgType);
+
+        populateTypeAwareClass(typesBuilder, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
         var constructor = constructorBuilder();
         var constructorBody = CodeBlock.builder();
@@ -439,12 +443,13 @@ public class JavaPoetUtils {
 
         typesBuilder.addMethod(constructor.addCode(constructorBody.build()).build());
 
-        typesBuilder = addValues(typesBuilder, className, paramNames, uniqueNames);
+        addValues(typesBuilder, className, paramNames, uniqueNames);
         return typesBuilder.build();
     }
 
-    private static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder fieldsClassBuilder, String nameFieldName, String typeFieldName,
-                                                           ClassName nameArgType, ParameterizedTypeName typeArgType) {
+    public static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder fieldsClassBuilder,
+                                                          String nameFieldName, String typeFieldName,
+                                                          ClassName nameArgType, ParameterizedTypeName typeArgType) {
         return fieldsClassBuilder
                 .addField(FieldSpec.builder(nameArgType, nameFieldName).addModifiers(PUBLIC, FINAL).build())
                 .addField(FieldSpec.builder(typeArgType, typeFieldName).addModifiers(PUBLIC, FINAL).build())
@@ -464,23 +469,23 @@ public class JavaPoetUtils {
                 );
     }
 
-    private static void addGetter(
-            TypeSpec.Builder fieldsClassBuilder, ClassName beanType, TypeVariableName propertyTypeVar,
-            ParameterizedTypeName getterType, String getterName
+    public static void addGetter(
+            TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar,
+            ParameterizedTypeName getterType, String getterFieldName
     ) {
-        fieldsClassBuilder.addField(FieldSpec.builder(getterType, getterName).addModifiers(PUBLIC, FINAL).build());
-        fieldsClassBuilder.addMethod(
+        builder.addField(FieldSpec.builder(getterType, getterFieldName).addModifiers(PUBLIC, FINAL).build());
+        builder.addMethod(
                 methodBuilder("get")
                         .addAnnotation(Override.class)
                         .addModifiers(PUBLIC)
                         .addParameter(beanType, "bean")
                         .returns(propertyTypeVar)
-                        .addStatement("return this." + getterName + ".apply(bean)")
+                        .addStatement("return this." + getterFieldName + ".apply(bean)")
                         .build()
         );
     }
 
-    private static void addSetter(
+    public static void addSetter(
             TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar,
             ParameterizedTypeName setterType, String setterName
     ) {
@@ -496,30 +501,30 @@ public class JavaPoetUtils {
         );
     }
 
-    private static ParameterizedTypeName getFunctionType(ClassName beanType, TypeVariableName propertyTypeVar) {
+    public static ParameterizedTypeName getFunctionType(ClassName beanType, TypeVariableName propertyTypeVar) {
         return ParameterizedTypeName.get(ClassName.get(Function.class), beanType, propertyTypeVar);
     }
 
-    private static ParameterizedTypeName getBiConsumerType(ClassName beanType, TypeVariableName propertyTypeVar) {
+    public static ParameterizedTypeName getBiConsumerType(ClassName beanType, TypeVariableName propertyTypeVar) {
         return ParameterizedTypeName.get(ClassName.get(BiConsumer.class), beanType, propertyTypeVar);
     }
 
-    private static TypeSpec.Builder typeAwareClass(ClassName className, TypeVariableName typeVariable) {
+    public static TypeSpec.Builder typeAwareClass(ClassName className, TypeVariableName typeVariable) {
         return classBuilder(className)
                 .addTypeVariable(typeVariable)
                 .addSuperinterface(ParameterizedTypeName.get(ClassName.get(Typed.class), typeVariable))
                 .addModifiers(PUBLIC, STATIC);
     }
 
-    private static void populateConstructor(MethodSpec.Builder constructor, CodeBlock.Builder constructorBody,
-                                            ClassName nameType, String nameName, TypeName typeType, String typeName) {
+    public static void populateConstructor(MethodSpec.Builder constructor, CodeBlock.Builder constructorBody,
+                                           ClassName nameType, String nameName, TypeName typeType, String typeName) {
         constructor.addModifiers(PRIVATE)
-                .addParameter(nameType, nameName)
-                .addParameter(typeType, typeName);
+                .addParameter(nameType, "name")
+                .addParameter(typeType, "type");
 
         constructorBody
-                .addStatement("this." + nameName + " = " + nameName)
-                .addStatement("this." + typeName + " = " + typeName);
+                .addStatement("this." + nameName + " = " + "name")
+                .addStatement("this." + typeName + " = " + "type");
     }
 
     static MethodSpec callValuesMethod(String name, TypeName typeClassName, boolean overr) {
@@ -557,8 +562,8 @@ public class JavaPoetUtils {
         for (var setter : builderInfo.getSetters()) {
             var setterName = setter.getName();
             builder.addField(newPropertyConstant(
-                    beanType, setter.getEvaluatedType(), className, setterName,
-                    null, null, setter.getSetter(), null));
+                    setter.getEvaluatedType(), className, setterName,
+                    null, false, null, setter.getSetter(), null));
             setterNames.add(setterName);
         }
         var uniqueNames = new HashSet<>(setterNames);
@@ -572,7 +577,7 @@ public class JavaPoetUtils {
         var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
         var setterType = getBiConsumerType(beanType, typeVariable);
 
-        builder = populateTypeAwareClass(builder, nameFieldName, typeFieldName, nameArgType, typeArgType);
+        populateTypeAwareClass(builder, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
         var constructor = constructorBuilder();
         var constructorBody = CodeBlock.builder();
@@ -602,13 +607,13 @@ public class JavaPoetUtils {
         return builder.build();
     }
 
-    private static TypeSpec.Builder addValues(
-            TypeSpec.Builder builder, ClassName typeName, Collection<String> propertyNames, Set<String> uniqueNames
+    public static TypeSpec.Builder addValues(
+            TypeSpec.Builder builder, ClassName typeName, Collection<String> values, Set<String> uniqueNames
     ) {
         var valuesField = getUniqueName("values", uniqueNames);
         return builder
                 .addField(listField(valuesField, typeName, CodeBlock.builder()
-                        .add(propertyNames.stream().reduce((l, r) -> l + (!l.isEmpty() ? ", " : "") + r)
+                        .add(values.stream().reduce((l, r) -> l + (!l.isEmpty() ? ", " : "") + r)
                                 .orElse("")).build(), PRIVATE, FINAL, STATIC)
                 )
                 .addMethod(MethodSpec.methodBuilder("values")
@@ -642,7 +647,7 @@ public class JavaPoetUtils {
                 mapValue).build();
     }
 
-    private static String getUniqueName(String name, Collection<String> uniqueNames) {
+    public static String getUniqueName(String name, Collection<String> uniqueNames) {
         while (uniqueNames.contains(name)) {
             name = "_" + name;
         }
@@ -653,14 +658,16 @@ public class JavaPoetUtils {
     private static boolean isReadable(MetaBean.Property property) {
         var getter = property.getGetter();
         var recordComponent = property.getRecordComponent();
-        var field = property.getField();
-        return getter != null || recordComponent != null || field != null;
+        return getter != null || recordComponent != null || isPublicField(property);
     }
 
     private static boolean isWriteable(MetaBean.Property property) {
         var setter = property.getSetter();
-        var field = property.getField();
-        return (setter != null || field != null) && property.getRecordComponent() == null;
+        return (setter != null || isPublicField(property)) && property.getRecordComponent() == null;
+    }
+
+    private static boolean isPublicField(MetaBean.Property property) {
+        return property.getField() != null && property.isPublicField();
     }
 
     private static FieldSpec newPropertyConstant(ClassName beanType, MetaBean.Property property, ClassName constType) {
@@ -670,43 +677,56 @@ public class JavaPoetUtils {
         var record = property.getRecordComponent();
         var getter = property.getGetter();
         var setter = property.getSetter();
-        return newPropertyConstant(beanType, type, constType, name, field, getter, setter, record);
+        var fieldPublic = property.isPublicField();
+        return newPropertyConstant(type, constType, name, field, fieldPublic, getter, setter, record);
     }
 
-    private static FieldSpec newPropertyConstant(ClassName beanType, TypeMirror propertyType,
+    private static FieldSpec newPropertyConstant(TypeMirror propertyType,
                                                  ClassName constType, String constName,
-                                                 VariableElement field, ExecutableElement getter,
-                                                 ExecutableElement setter, RecordComponentElement record) {
-        final CodeBlock getterArg;
-        var getterName = ofNullable(getter).map(ExecutableElement::getSimpleName).orElse(null);
-        if (getterName != null) {
-            getterArg = CodeBlock.builder().add("$T::$L", beanType, getterName).build();
-        } else if (record != null) {
-            var readAccessorName = record.getAccessor().getSimpleName();
-            getterArg = CodeBlock.builder().add("$T::$L", beanType, readAccessorName).build();
-        } else if (field != null) {
-            getterArg = CodeBlock.builder().add("bean -> bean.$L", field.getSimpleName()).build();
-        } else {
-            getterArg = null;
-        }
+                                                 VariableElement field, boolean isPublicField,
+                                                 ExecutableElement getter, ExecutableElement setter,
+                                                 RecordComponentElement record) {
+        var uniqueNames = new HashSet<String>();
+        var beanParamName = getUniqueName("bean", uniqueNames);
+        var valueParamName = getUniqueName("value", uniqueNames);
 
-        final CodeBlock setterArg;
-        var setterName = ofNullable(setter).map(ExecutableElement::getSimpleName).orElse(null);
-        if (setterName != null) {
-            setterArg = CodeBlock.builder().add("$T::$L", beanType, setterName).build();
-        } else if (record == null && field != null) {
-            setterArg = CodeBlock.builder().add("(bean, value) -> bean.$L = value", field.getSimpleName()).build();
-        } else {
-            setterArg = null;
-        }
+        var getterArgCode = getGetterArgCode(beanParamName, isPublicField, field, record, getter);
+        var setterArgCode = getSetterArgCode(beanParamName, valueParamName, isPublicField, field, record, setter);
 
         var typeName = TypeName.get(propertyType);
         return FieldSpec.builder(
                 ParameterizedTypeName.get(constType, getUnboxedTypeVarName(typeName)), constName, PUBLIC, FINAL, STATIC
-        ).initializer(newInstanceCall(constType, enumConstructorArgs(constName, dotClass(typeName), getterArg, setterArg))).build();
+        ).initializer(newInstanceCall(constType, enumConstructorArgs(constName, dotClass(typeName),
+                getterArgCode, setterArgCode))).build();
     }
 
-    private static TypeName getUnboxedTypeVarName(TypeName type) {
+    public static CodeBlock getSetterArgCode(String beanParamName, String valueParamName, boolean isPublicField,
+                                             VariableElement field, RecordComponentElement record,
+                                             ExecutableElement setter) {
+        var setterName = ofNullable(setter).map(ExecutableElement::getSimpleName).orElse(null);
+        if (setterName != null) {
+            return CodeBlock.builder().add("($L, $L) -> $L.$L($L)", beanParamName, valueParamName, beanParamName,
+                    setterName, valueParamName).build();
+        } else if (record == null && (field != null && isPublicField)) {
+            return CodeBlock.builder().add("($L, $L) -> $L.$L = $L",
+                    beanParamName, valueParamName, beanParamName, field.getSimpleName(), valueParamName
+            ).build();
+        }
+        return null;
+    }
+
+    public static CodeBlock getGetterArgCode(
+            String paramName, boolean isPublicField, VariableElement field,
+            RecordComponentElement record, ExecutableElement getter
+    ) {
+        var getterName = ofNullable(getter).map(ExecutableElement::getSimpleName).orElse(null);
+        var callName = getterName != null ? getterName + "()" : record != null
+                ? record.getAccessor().getSimpleName() + "()" : field != null && isPublicField
+                ? field.getSimpleName().toString() : null;
+        return callName != null ? CodeBlock.builder().add("$L -> $L.$L", paramName, paramName, callName).build() : null;
+    }
+
+    public static TypeName getUnboxedTypeVarName(TypeName type) {
         return type.isPrimitive() ? type.box() : type;
     }
 

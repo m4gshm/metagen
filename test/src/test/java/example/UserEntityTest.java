@@ -58,7 +58,7 @@ public class UserEntityTest {
 
     @Test
     public void fieldsCompleteness() {
-        var expected = Set.of(age, id, name, address);
+        var expected = Set.of(age, id, name, address, legalAddress);
         assertEquals(expected.size(), values().size());
         assertEquals(expected, Set.copyOf(values()));
     }
@@ -66,7 +66,8 @@ public class UserEntityTest {
     @Test
     public void userEntityBuilderCompleteness() {
         var values = BuilderMeta.values();
-        var expected = Set.of(BuilderMeta.age, BuilderMeta.id, BuilderMeta.name, BuilderMeta.address);
+        var expected = Set.of(BuilderMeta.age, BuilderMeta.id, BuilderMeta.name,
+                BuilderMeta.address, BuilderMeta.legalAddress);
         assertEquals(expected.size(), values.size());
         assertEquals(expected, Set.copyOf(values));
     }

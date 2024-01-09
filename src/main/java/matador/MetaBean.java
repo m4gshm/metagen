@@ -55,10 +55,15 @@ public class MetaBean {
         private ExecutableElement setter;
         private ExecutableElement getter;
         private VariableElement field;
+        private boolean isPublicField;
         private RecordComponentElement recordComponent;
         private TypeMirror type;
         private TypeMirror evaluatedType;
-        private List<? extends AnnotationMirror> annotations;
+        private List<AnnotationMirror> annotations;
+
+        public boolean isPublic() {
+            return (field != null && isPublicField) || setter != null || getter != null;
+        }
     }
 
     @Data

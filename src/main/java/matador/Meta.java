@@ -22,6 +22,8 @@ public @interface Meta {
 
     boolean aggregate() default true;
 
+    Extend[] customizers() default {};
+
     @Retention(SOURCE)
     @interface Properties {
         String METHOD_NAME = "properties";
@@ -90,5 +92,20 @@ public @interface Meta {
         String className() default CLASS_NAME;
 
         boolean detect() default false;
+    }
+
+    @Retention(SOURCE)
+    @interface Extend {
+        Class<? extends MetaCustomizer<?>> value();
+
+        Opt[] opts() default {};
+
+        @Retention(SOURCE)
+        @interface Opt {
+            String key();
+
+            String value();
+        }
+
     }
 }
