@@ -447,26 +447,28 @@ public class JavaPoetUtils {
         return typesBuilder.build();
     }
 
-    public static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder fieldsClassBuilder,
+    public static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder builder,
                                                           String nameFieldName, String typeFieldName,
                                                           ClassName nameArgType, ParameterizedTypeName typeArgType) {
-        return fieldsClassBuilder
-                .addField(FieldSpec.builder(nameArgType, nameFieldName).addModifiers(PUBLIC, FINAL).build())
-                .addField(FieldSpec.builder(typeArgType, typeFieldName).addModifiers(PUBLIC, FINAL).build())
-                .addMethod(
-                        methodBuilder("name")
-                                .addAnnotation(Override.class)
-                                .addModifiers(PUBLIC).returns(nameArgType)
-                                .addStatement("return this." + nameFieldName)
-                                .build()
-                )
-                .addMethod(
-                        methodBuilder("type")
-                                .addAnnotation(Override.class)
-                                .addModifiers(PUBLIC).returns(typeArgType)
-                                .addStatement("return this." + typeFieldName)
-                                .build()
-                );
+        addFieldWithReadAccessor(builder, nameFieldName, nameArgType, "name", true);
+        addFieldWithReadAccessor(builder, typeFieldName, typeArgType, "type", true);
+        return builder;
+    }
+
+    public static void addFieldWithReadAccessor(
+            TypeSpec.Builder builder, String fieldName, TypeName type, String accessorName, boolean override
+    ) {
+        var accessor = methodBuilder(accessorName);
+        if (override) {
+            accessor.addAnnotation(Override.class);
+        }
+        accessor
+                .addModifiers(PUBLIC)
+                .returns(type)
+                .addStatement("return this." + fieldName);
+        builder
+                .addField(FieldSpec.builder(type, fieldName).addModifiers(PUBLIC, FINAL).build())
+                .addMethod(accessor.build());
     }
 
     public static void addGetter(
@@ -518,7 +520,8 @@ public class JavaPoetUtils {
 
     public static void populateConstructor(MethodSpec.Builder constructor, CodeBlock.Builder constructorBody,
                                            ClassName nameType, String nameName, TypeName typeType, String typeName) {
-        constructor.addModifiers(PRIVATE)
+        constructor
+                .addModifiers(PRIVATE)
                 .addParameter(nameType, "name")
                 .addParameter(typeType, "type");
 
