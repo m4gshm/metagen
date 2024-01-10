@@ -20,7 +20,9 @@ import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.*;
 
 public class JavaPoetUtils {
-    public static TypeSpec.Builder newTypeBuilder(Messager messager, MetaBean bean, Collection<? extends MetaCustomizer> customizers) {
+    public static TypeSpec.Builder newTypeBuilder(
+            Messager messager, MetaBean bean, Collection<? extends MetaCustomizer> customizers
+    ) {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
@@ -89,9 +91,9 @@ public class JavaPoetUtils {
                         superclass.getClassName() + parentClass.classNameSuffix(), uniqueNames
                 );
                 builder.addType(newEnumParams(superTypeName, superclass.getTypeParameters()));
-                builder.addMethod(
-                        callValuesMethod(parentClass.methodName(), ClassName.get("", superTypeName), inheritSuperParams)
-                );
+                builder.addMethod(callValuesMethod(
+                        parentClass.methodName(), ClassName.get("", superTypeName), inheritSuperParams
+                ));
                 addInheritedParams(
                         inheritedParamsFieldInitializer,
                         ClassName.get(Meta.Parameters.Inherited.Super.class),
@@ -647,11 +649,7 @@ public class JavaPoetUtils {
     }
 
     public static CodeBlock mapEntry(CodeBlock mapKey, String mapValue) {
-        return CodeBlock.builder().add(
-                "$T.entry($L, $L)",
-                Map.class,
-                mapKey,
-                mapValue).build();
+        return CodeBlock.builder().add("$T.entry($L, $L)", Map.class, mapKey, mapValue).build();
     }
 
     public static String getUniqueName(String name, Collection<String> uniqueNames) {
@@ -712,11 +710,12 @@ public class JavaPoetUtils {
                                              ExecutableElement setter) {
         var setterName = ofNullable(setter).map(ExecutableElement::getSimpleName).orElse(null);
         if (setterName != null) {
-            return CodeBlock.builder().add("($L, $L) -> $L.$L($L)", beanParamName, valueParamName, beanParamName,
-                    setterName, valueParamName).build();
+            return CodeBlock.builder().addNamed("($bean:L, $val:L) -> $bean:L.$setter:L($val:L)",
+                    Map.of("bean", beanParamName, "val", valueParamName, "setter", setterName)
+            ).build();
         } else if (record == null && (field != null && isPublicField)) {
-            return CodeBlock.builder().add("($L, $L) -> $L.$L = $L",
-                    beanParamName, valueParamName, beanParamName, field.getSimpleName(), valueParamName
+            return CodeBlock.builder().addNamed("($bean:L, $val:L) -> $bean:L.$field:L = $val:L",
+                    Map.of("bean", beanParamName, "val", valueParamName, "field", field.getSimpleName())
             ).build();
         }
         return null;
@@ -726,11 +725,11 @@ public class JavaPoetUtils {
             String paramName, boolean isPublicField, VariableElement field,
             RecordComponentElement record, ExecutableElement getter
     ) {
-        var getterName = ofNullable(getter).map(ExecutableElement::getSimpleName).orElse(null);
-        var callName = getterName != null ? getterName + "()" : record != null
-                ? record.getAccessor().getSimpleName() + "()" : field != null && isPublicField
-                ? field.getSimpleName().toString() : null;
-        return callName != null ? CodeBlock.builder().add("$L -> $L.$L", paramName, paramName, callName).build() : null;
+        var callName = getter != null ? getter.getSimpleName() + "()"
+                : record != null ? record.getAccessor().getSimpleName() + "()"
+                : field != null && isPublicField ? field.getSimpleName().toString() : null;
+        return callName != null ? CodeBlock.builder().addNamed("$param:L -> $param:L.$call:L", Map.of(
+                "param", paramName, "call", callName)).build() : null;
     }
 
     public static TypeName getUnboxedTypeVarName(TypeName type) {
