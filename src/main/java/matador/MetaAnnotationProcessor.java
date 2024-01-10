@@ -21,6 +21,7 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
+import static matador.JavaPoetUtils.dotClass;
 import static matador.JavaPoetUtils.initMapByEntries;
 import static matador.MetaBeanExtractor.getAggregatorName;
 
@@ -109,7 +110,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             var aggregate = beans.stream().filter(b -> b.getMeta().aggregate()).toList();
             if (!aggregate.isEmpty()) {
                 var mapParts = aggregate.stream().map(bean -> JavaPoetUtils.mapEntry(
-                        bean.getType().getQualifiedName().toString() + ".class", "new " + bean.getName() + "()"
+                        dotClass(ClassName.get(bean.getType())), "new " + bean.getName() + "()"
                 ).toString()).toList();
 
                 var typeName = getAggregatorName(pack);

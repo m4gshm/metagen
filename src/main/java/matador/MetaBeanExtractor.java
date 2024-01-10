@@ -109,8 +109,8 @@ public class MetaBeanExtractor {
     static TypeMirror evalType(TypeMirror type, List<MetaBean.Param> beanParameters) {
         return type instanceof TypeVariable typeVariable ? evalType(typeVariable, beanParameters)
                 : type instanceof IntersectionType intersectionType ? evalType(intersectionType, beanParameters)
-                : type instanceof DeclaredType dt ? dt.asElement().asType()
-                : type instanceof ArrayType || type instanceof PrimitiveType ? type : null;
+//                : type instanceof DeclaredType dt ? dt.asElement().asType()
+                : type instanceof DeclaredType || type instanceof ArrayType || type instanceof PrimitiveType ? type : null;
     }
 
     private static TypeMirror evalType(IntersectionType intersectionType, List<MetaBean.Param> beanParameters) {
@@ -122,7 +122,7 @@ public class MetaBeanExtractor {
                 ? beanParameters.stream().collect(toMap(p -> p.getName().asType(), MetaBean.Param::getType))
                 : Map.<TypeMirror, TypeMirror>of();
         var type = collect.get(typeVariable);
-        if (type != null && !type.equals(typeVariable)) {
+        if (type != null && !isEquals(type, typeVariable)) {
             return evalType(type, beanParameters);
         } else {
             return evalType(typeVariable.getUpperBound(), beanParameters);
@@ -170,7 +170,7 @@ public class MetaBeanExtractor {
             var builderType = beanType.getEnclosedElements().stream()
                     .map(e -> e instanceof TypeElement te ? te : null)
                     .filter(e -> e != null && e.getSimpleName().contentEquals(builderClassName)
-                            && beanType.equals(e.getEnclosingElement())
+                            && isEquals(beanType, e.getEnclosingElement())
                     ).findFirst().orElse(null);
 
             if (builderType == null) {
@@ -205,6 +205,32 @@ public class MetaBeanExtractor {
         return null;
     }
 
+    public static boolean isEquals(Element element1, Element element2) {
+        return element1 != null && element1.equals(element2) || element2 == null;
+    }
+
+    public static boolean isEquals(TypeMirror type1, TypeMirror type2) {
+        return type1 instanceof DeclaredType dt1 && type2 instanceof DeclaredType dt2
+                ? isEquals(dt1.asElement(), dt2.asElement()) && isListEquals(dt1.getTypeArguments(), dt2.getTypeArguments())
+                : type1 != null && type1.equals(type2) || type2 == null;
+    }
+
+    private static boolean isListEquals(List<? extends TypeMirror> ta1, List<? extends TypeMirror> ta2) {
+        if (ta1 != null && ta2 != null) {
+            if (ta1.size() != ta2.size()) {
+                return false;
+            }
+            for (int i = 0; i < ta1.size(); i++) {
+                if (!isEquals(ta1.get(i), ta2.get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return ta1 == ta2;
+    }
+
+
     private static ArrayList<BeanBuilder.Setter> getBuilderSetters(
             Messager messager, TypeElement typeElement, BeanBuilder superBuilder) {
         var setters = new ArrayList<BeanBuilder.Setter>();
@@ -221,7 +247,7 @@ public class MetaBeanExtractor {
                 var isStatic = modifiers.contains(STATIC);
                 if (!isStatic && isPublic && enclosedElement instanceof ExecutableElement ee) {
                     var returnType = evalType(ee.getReturnType(), typeParameters);
-                    var returnSame = builderType.equals(returnType);
+                    var returnSame = isEquals(builderType, returnType);
                     var parameters = ee.getParameters();
                     if (returnSame && parameters.size() == 1) {
                         var paramElement = parameters.get(0);
@@ -278,7 +304,7 @@ public class MetaBeanExtractor {
         }
         for (int i = 0; i < typeParameters.size(); i++) {
             var typeParameter = typeParameters.get(i);
-            if (typeVariable.equals(typeParameter)) {
+            if (isEquals(typeVariable, typeParameter)) {
                 return i;
             }
         }

@@ -62,7 +62,7 @@ public class MetaBean {
         private List<AnnotationMirror> annotations;
 
         public boolean isPublic() {
-            return (field != null && isPublicField) || setter != null || getter != null;
+            return (field != null && isPublicField) || setter != null || getter != null || recordComponent != null;
         }
     }
 

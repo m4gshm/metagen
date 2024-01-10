@@ -41,7 +41,7 @@ public class JavaPoetUtils {
 
         var typeField = FieldSpec.builder(
                         typeFieldType, "type", PUBLIC, FINAL)
-                .initializer(CodeBlock.builder().addStatement("$T.class", beanType).build())
+                .initializer(CodeBlock.builder().addStatement(dotClass(beanType)).build())
                 .build();
 
         var instanceField = FieldSpec.builder(
@@ -395,7 +395,7 @@ public class JavaPoetUtils {
         return CodeBlock.builder().add("new $T<>($L)", className, args).build();
     }
 
-    public static CodeBlock enumConstructorArgs(String name, String type, CodeBlock getter, CodeBlock setter) {
+    public static CodeBlock enumConstructorArgs(String name, CodeBlock type, CodeBlock getter, CodeBlock setter) {
         var builder = enumConstructorArgs(name, type).toBuilder();
         if (getter != null) {
             builder.add(", ").add(getter);
@@ -406,12 +406,16 @@ public class JavaPoetUtils {
         return builder.build();
     }
 
-    public static CodeBlock enumConstructorArgs(String name, String type) {
+    public static CodeBlock enumConstructorArgs(String name, CodeBlock type) {
         return CodeBlock.builder().add("\"" + name + "\"").add(", ").add(type).build();
     }
 
-    public static String dotClass(TypeName type) {
-        return (type != null ? type : TypeName.OBJECT) + ".class";
+    public static CodeBlock dotClass(TypeName type) {
+        if (type instanceof ParameterizedTypeName pt) {
+            type = pt.rawType;
+            return CodeBlock.of("(Class)$T.class", type);
+        }
+        return CodeBlock.of("$T.class", type);
     }
 
     private static TypeSpec newEnumParams(String enumName, List<MetaBean.Param> beanTypeParameters) {
@@ -639,10 +643,10 @@ public class JavaPoetUtils {
         if (addComma) {
             mapInitializer.add(",\n");
         }
-        mapInitializer.add(mapEntry(mapKey + ".class", mapValue)).unindent();
+        mapInitializer.add(mapEntry(dotClass(mapKey), mapValue)).unindent();
     }
 
-    public static CodeBlock mapEntry(String mapKey, String mapValue) {
+    public static CodeBlock mapEntry(CodeBlock mapKey, String mapValue) {
         return CodeBlock.builder().add(
                 "$T.entry($L, $L)",
                 Map.class,
