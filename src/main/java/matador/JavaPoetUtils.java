@@ -7,6 +7,8 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -16,6 +18,7 @@ import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
+import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.*;
 
@@ -695,8 +698,8 @@ public class JavaPoetUtils {
         var beanParamName = getUniqueName("bean", uniqueNames);
         var valueParamName = getUniqueName("value", uniqueNames);
 
-        var getterArgCode = getGetterArgCode(beanParamName, isPublicField, field, record, getter);
-        var setterArgCode = getSetterArgCode(beanParamName, valueParamName, isPublicField, field, record, setter);
+        var getterArgCode = getGetterCallCode(beanParamName, isPublicField, field, record, getter);
+        var setterArgCode = getSetterCallCode(beanParamName, valueParamName, isPublicField, field, record, setter);
 
         var typeName = TypeName.get(propertyType);
         return FieldSpec.builder(
@@ -705,9 +708,9 @@ public class JavaPoetUtils {
                 getterArgCode, setterArgCode))).build();
     }
 
-    public static CodeBlock getSetterArgCode(String beanParamName, String valueParamName, boolean isPublicField,
-                                             VariableElement field, RecordComponentElement record,
-                                             ExecutableElement setter) {
+    public static CodeBlock getSetterCallCode(String beanParamName, String valueParamName, boolean isPublicField,
+                                              VariableElement field, RecordComponentElement record,
+                                              ExecutableElement setter) {
         var setterName = ofNullable(setter).map(ExecutableElement::getSimpleName).orElse(null);
         if (setterName != null) {
             return CodeBlock.builder().addNamed("($bean:L, $val:L) -> $bean:L.$setter:L($val:L)",
@@ -721,15 +724,72 @@ public class JavaPoetUtils {
         return null;
     }
 
-    public static CodeBlock getGetterArgCode(
+    public static CodeBlock getGetterCallCode(
             String paramName, boolean isPublicField, VariableElement field,
             RecordComponentElement record, ExecutableElement getter
     ) {
-        var callName = getter != null ? getter.getSimpleName() + "()"
-                : record != null ? record.getAccessor().getSimpleName() + "()"
-                : field != null && isPublicField ? field.getSimpleName().toString() : null;
+        var callName = getCallName(isPublicField, field, record, getter);
         return callName != null ? CodeBlock.builder().addNamed("$param:L -> $param:L.$call:L", Map.of(
                 "param", paramName, "call", callName)).build() : null;
+    }
+
+    public static CodeBlock getGetterCallInitByNewCode(
+            String varName, String paramName,
+            boolean isPublicField, VariableElement field,
+            ExecutableElement getter, ExecutableElement setter,
+            Collection<String> uniqueNames
+    ) {
+        if (setter == null && !(isPublicField && field != null)) {
+            throw new IllegalArgumentException("no setter of public field");
+        }
+        var callName = getCallName(isPublicField, field, null, getter);
+        var tempVar = getUniqueName(varName, uniqueNames);
+        var callType = getCallType(isPublicField, field, null, getter);
+
+        var newInstance = requireNonNull(getNewInstanceCode(callType),
+                () -> "cannot determine object instantiate code for '" + callType + "'");
+
+        var builder = CodeBlock.builder()
+                .beginControlFlow("$L -> ", paramName)
+                .addStatement("var $L = $L.$L", tempVar, paramName, callName)
+                .beginControlFlow("if ($L == null)", tempVar)
+                .addStatement("$L = $L", tempVar, newInstance);
+
+        if (isPublicField && field != null) {
+            builder.addStatement("$L.$L = $L", paramName, callName, tempVar);
+        } else {
+            builder.addStatement("$L.$L($L)", paramName, setter.getSimpleName().toString(), tempVar);
+        }
+        return builder
+                .endControlFlow()
+                .addStatement("return $L", tempVar)
+                .endControlFlow()
+                .build();
+    }
+
+    private static CodeBlock getNewInstanceCode(TypeMirror typeMirror) {
+        if (typeMirror instanceof DeclaredType dt) {
+            return CodeBlock.of("new $T()", TypeName.get(typeMirror));
+        }
+        if (typeMirror instanceof ArrayType at) {
+            return CodeBlock.of("new $T[0]", TypeName.get(typeMirror));
+        }
+        return null;
+    }
+
+    private static String getCallName(boolean isPublicField, VariableElement field,
+                                      RecordComponentElement record, ExecutableElement getter) {
+        return getter != null ? getter.getSimpleName() + "()"
+                : record != null ? record.getAccessor().getSimpleName() + "()"
+                : field != null && isPublicField ? field.getSimpleName().toString() : null;
+    }
+
+    private static TypeMirror getCallType(
+            boolean isPublicField, VariableElement field, RecordComponentElement record, ExecutableElement getter
+    ) {
+        return getter != null ? getter.getReturnType()
+                : record != null ? record.getAccessor().getReturnType()
+                : field != null && isPublicField ? field.asType() : null;
     }
 
     public static TypeName getUnboxedTypeVarName(TypeName type) {

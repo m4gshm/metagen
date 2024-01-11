@@ -46,6 +46,7 @@ public class UserEntity extends Entity<Long> implements IdAware<Long> {
             @AttributeOverride(name = "street", column = @Column(name = "LEGAL_STREET")),
     })
     private Address legalAddress;
+    private Tag[] tags;
 
     @Meta
     @Data
@@ -66,5 +67,13 @@ public class UserEntity extends Entity<Long> implements IdAware<Long> {
         private String postalCode;
         private String city;
         private String street;
+    }
+
+    @Data
+    @Builder(access = PUBLIC, toBuilder = true)
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Tag {
+        private String tagValue;
     }
 }

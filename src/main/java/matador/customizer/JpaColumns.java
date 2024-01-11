@@ -17,6 +17,7 @@ import javax.lang.model.type.DeclaredType;
 import java.util.*;
 
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
+import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Character.*;
 import static java.util.Collections.reverse;
@@ -31,17 +32,23 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
     public static final String OPT_CLASS_NAME = "className";
     public static final String OPT_GET_SUPERCLASS_COLUMNS = "getSuperclassColumns";
+    public static final String OPT_CHECK_FOR_ENTITY_ANNOTATION = "checkForEntityAnnotation";
     public static final String DEFAULT_GET_SUPERCLASS_COLUMNS = TRUE.toString();
+    public static final String DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = FALSE.toString();
     public static final String DEFAULT_CLASS_NAME = "JpaColumn";
 
     private final String className;
     private final boolean getSuperclassColumns;
+    private final boolean checkForEntityAnnotation;
 
     public JpaColumns(Map<String, String> opts) {
         opts = opts != null ? opts : Map.of();
         this.className = opts.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME);
         this.getSuperclassColumns = opts.getOrDefault(
                 OPT_GET_SUPERCLASS_COLUMNS, DEFAULT_GET_SUPERCLASS_COLUMNS
+        ).equals(TRUE.toString());
+        this.checkForEntityAnnotation = opts.getOrDefault(
+                OPT_CHECK_FOR_ENTITY_ANNOTATION, DEFAULT_CHECK_FOR_ENTITY_ANNOTATION
         ).equals(TRUE.toString());
     }
 
@@ -113,24 +120,33 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                 var field = property.getField();
                 var publicField = property.isPublicField();
                 var propertyName = property.getName();
-                var getterPartCode = requireNonNull(getGetterArgCode(
-                        callableName, publicField, field,
-                        property.getRecordComponent(), property.getGetter()
+                var record = property.getRecordComponent();
+                var getter = property.getGetter();
+                var setter = property.getSetter();
+                var getterPartCode = requireNonNull(getGetterCallCode(
+                        callableName, publicField, field, record, getter
                 ), () -> "No public read accessor part '" + propertyName + "' for column '" + column.name() + "'");
                 getterArgCodeB.add(".map(").add(getterPartCode).add(")");
                 if (i == pathAmount - 1) {
                     var propParam = getUniqueName("prop", uniqueNames);
-                    var setter = property.getSetter();
                     var setCall = setter != null
                             ? CodeBlock.builder().add("$L($L)", setter.getSimpleName(), valueParam).build()
                             : (field != null && publicField)
                             ? CodeBlock.builder().add("$L.$L = $L", propParam, field.getSimpleName(), valueParam).build()
                             : null;
-                    requireNonNull(setCall, () -> "No public write accessor part '" + propertyName + "' for column '" + column.name() + "'");
+                    requireNonNull(setCall, () -> "no public write accessor part '" + propertyName + "' for column '" + column.name() + "'");
 
                     setterArgCodeB.add(".ifPresent($L -> $L.$L)", propParam, propParam, setCall);
                 } else {
-                    setterArgCodeB.add(".map(").add(getterPartCode).add(")");
+//                    var code = getGetterCallCode(callableName, publicField, field, record, getter);
+                    var code = getGetterCallInitByNewCode(
+                            "v", callableName, publicField, field,
+                            getter, setter, uniqueNames
+                    );
+                    var intermediateGetterPartCode = requireNonNull(code, () -> "No public read accessor part '" +
+                            propertyName + "' for column '" + column.name() + "'"
+                    );
+                    setterArgCodeB.add(".map(").add(intermediateGetterPartCode).add(")");
                 }
                 callableName = getUniqueName(propertyName, uniqueNames);
             }
@@ -150,8 +166,8 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             var publicField = property.isPublicField();
             var field = property.getField();
             var record = property.getRecordComponent();
-            getterArgCode = getGetterArgCode(beanParamName, publicField, field, record, property.getGetter());
-            setterArgCode = getSetterArgCode(
+            getterArgCode = getGetterCallCode(beanParamName, publicField, field, record, property.getGetter());
+            setterArgCode = getSetterCallCode(
                     beanParamName, valueParamName, publicField, field, record, property.getSetter()
             );
         }
@@ -160,7 +176,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         var name = column.name();
         var strPath = straightPath.stream().map(MetaBean.Property::getName).reduce((l, r) -> l + "." + r).orElse("");
 
-        var enumConstructorArgs = CodeBlock.builder().add("\"" + strPath + "\", ").add(
+        var enumConstructorArgs = CodeBlock.builder().add(" " + column.pk() + ", ").add("\"" + strPath + "\", ").add(
                 enumConstructorArgs(name, dotClass(type), getterArgCode, setterArgCode)
         ).build();
 
@@ -203,10 +219,10 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             }
 
             if (embedded != null || embeddedId != null) {
-                var embeddedColumns = getEmbeddedColumns(messager, property,
-                        getColumnOverrides(propAnnotations.get("javax.persistence.AttributeOverrides")));
-                columns.addAll(embeddedId != null
-                        ? embeddedColumns
+                var embeddedColumns = getEmbeddedColumns(messager, property, getColumnOverrides(
+                        propAnnotations.get("javax.persistence.AttributeOverrides"))
+                );
+                columns.addAll(embeddedId == null ? embeddedColumns
                         : embeddedColumns.stream().map(c -> c.toBuilder().pk(true).build()).toList()
                 );
             } else {
@@ -229,7 +245,8 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     private static List<Column> getEmbeddedColumns(
             Messager messager, MetaBean.Property property, Map<String, String> columnOverrides
     ) {
-        if (property.getEvaluatedType() instanceof DeclaredType dt && dt.asElement() instanceof TypeElement te) {
+        var type = property.getEvaluatedType();
+        if (type instanceof DeclaredType dt && dt.asElement() instanceof TypeElement te) {
             var embeddedBean = new MetaBeanExtractor(messager).getBean(te);
             return getColumns(messager, embeddedBean, columnOverrides).stream().map(embeddedColumn -> {
                 var oldPath = embeddedColumn.path();
@@ -240,93 +257,98 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                 newPath.add(property);
                 return embeddedColumn.toBuilder().path(newPath).build();
             }).toList();
-        } else {
-            //todo log
         }
-        return List.of();
+        throw new UnsupportedOperationException("unsupported embedded type, property '" + property.getName() + "', type '" + type + "'");
     }
 
     @Override
     public TypeSpec.Builder customize(Messager messager, MetaBean bean, TypeSpec.Builder out) {
         var beanType = ClassName.get(bean.getType());
         var beanAnnotations = getAnnotationElements(bean.getType().getAnnotationMirrors());
-        var entity = beanAnnotations.get("javax.persistence.Entity");
-        if (entity != null) {
-            var className = ClassName.get("", this.className);
-            var typeVariable = TypeVariableName.get("T");
-
-            var jpaColumnsClass = typeAwareClass(className, typeVariable)
-                    .addModifiers(FINAL)
-                    .addSuperinterface(
-                            ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable)
-                    );
-
-            var columnOverrides = getColumnOverrides(beanAnnotations.get("javax.persistence.AttributeOverrides"));
-
-            var columnNames = new LinkedHashSet<String>();
-            var columns = getColumns(messager, bean, columnOverrides);
-
-            if (this.getSuperclassColumns) {
-                var parentColumnOverrides = new LinkedHashMap<>(columnOverrides);
-                var superclass = bean.getSuperclass();
-                while (superclass != null) {
-                    var superclassAnnotations = getAnnotationElements(superclass.getType().getAnnotationMirrors());
-                    var superclassColumnOverrides = getColumnOverrides(superclassAnnotations.get("javax.persistence.AttributeOverrides"));
-                    parentColumnOverrides.putAll(superclassColumnOverrides);
-                    var superclassColumns = getColumns(messager, superclass, parentColumnOverrides);
-                    superclass = superclass.getSuperclass();
-                    columns.addAll(superclassColumns);
-                }
-            }
-
-            for (var column : columns) {
-                columnNames.add(addColumnConst(column, className, jpaColumnsClass));
-            }
-
-            var uniqueNames = new HashSet<>(columnNames);
-
-            var constructor = constructorBuilder();
-            var constructorBody = CodeBlock.builder();
-
-            var pathArgType = ClassName.get(String.class);
-            var nameArgType = ClassName.get(String.class);
-            var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
-
-            var pathFieldName = getUniqueName("path", uniqueNames);
-            var nameFieldName = getUniqueName("name", uniqueNames);
-            var typeFieldName = getUniqueName("type", uniqueNames);
-
-            var getterFieldName = getUniqueName("getter", uniqueNames);
-            var setterFieldName = getUniqueName("setter", uniqueNames);
-
-            var getterType = getFunctionType(beanType, typeVariable);
-            var setterType = getBiConsumerType(beanType, typeVariable);
-
-            constructor.addParameter(pathArgType, "path");
-            constructorBody.addStatement("this." + pathFieldName + " = " + "path");
-
-            populateConstructor(constructor, constructorBody, nameArgType, nameFieldName, typeArgType, typeFieldName);
-            constructor
-                    .addParameter(getterType, "getter")
-                    .addParameter(setterType, "setter");
-
-            constructorBody
-                    .addStatement("this." + getterFieldName + " = " + "getter")
-                    .addStatement("this." + setterFieldName + " = " + "setter");
-
-            jpaColumnsClass.addMethod(constructor.addCode(constructorBody.build()).build());
-
-            addFieldWithReadAccessor(jpaColumnsClass, pathFieldName, pathArgType, "path", false);
-
-            populateTypeAwareClass(jpaColumnsClass, nameFieldName, typeFieldName, nameArgType, typeArgType);
-
-            addGetter(jpaColumnsClass, beanType, typeVariable, getterType, getterFieldName);
-            addSetter(jpaColumnsClass, beanType, typeVariable, setterType, setterFieldName);
-
-            addValues(jpaColumnsClass, className, columnNames, uniqueNames);
-
-            out.addType(jpaColumnsClass.build());
+        if (this.checkForEntityAnnotation && beanAnnotations.get("javax.persistence.Entity") != null) {
+            return out;
         }
+        var className = ClassName.get("", this.className);
+        var typeVariable = TypeVariableName.get("T");
+
+        var jpaColumnsClass = typeAwareClass(className, typeVariable)
+                .addModifiers(FINAL)
+                .addSuperinterface(
+                        ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable)
+                );
+
+        var columnOverrides = getColumnOverrides(beanAnnotations.get("javax.persistence.AttributeOverrides"));
+
+        var columnNames = new LinkedHashSet<String>();
+        var columns = getColumns(messager, bean, columnOverrides);
+
+        if (this.getSuperclassColumns) {
+            var parentColumnOverrides = new LinkedHashMap<>(columnOverrides);
+            var superclass = bean.getSuperclass();
+            while (superclass != null) {
+                var superclassAnnotations = getAnnotationElements(superclass.getType().getAnnotationMirrors());
+                var superclassColumnOverrides = getColumnOverrides(superclassAnnotations.get("javax.persistence.AttributeOverrides"));
+                parentColumnOverrides.putAll(superclassColumnOverrides);
+                var superclassColumns = getColumns(messager, superclass, parentColumnOverrides);
+                superclass = superclass.getSuperclass();
+                columns.addAll(superclassColumns);
+            }
+        }
+
+        for (var column : columns) {
+            columnNames.add(addColumnConst(column, className, jpaColumnsClass));
+        }
+
+        var uniqueNames = new HashSet<>(columnNames);
+
+        var constructor = constructorBuilder();
+        var constructorBody = CodeBlock.builder();
+
+        var pkArgType = TypeName.get(boolean.class);
+        var pathArgType = ClassName.get(String.class);
+        var nameArgType = ClassName.get(String.class);
+        var typeArgType = ParameterizedTypeName.get(ClassName.get(Class.class), typeVariable);
+
+        var pkFieldName = getUniqueName("pk", uniqueNames);
+        var pathFieldName = getUniqueName("path", uniqueNames);
+        var nameFieldName = getUniqueName("name", uniqueNames);
+        var typeFieldName = getUniqueName("type", uniqueNames);
+
+        var getterFieldName = getUniqueName("getter", uniqueNames);
+        var setterFieldName = getUniqueName("setter", uniqueNames);
+
+        var getterType = getFunctionType(beanType, typeVariable);
+        var setterType = getBiConsumerType(beanType, typeVariable);
+
+        constructor
+                .addParameter(pkArgType, "pk")
+                .addParameter(pathArgType, "path");
+        constructorBody
+                .addStatement("this." + pkFieldName + " = " + "pk")
+                .addStatement("this." + pathFieldName + " = " + "path");
+
+        populateConstructor(constructor, constructorBody, nameArgType, nameFieldName, typeArgType, typeFieldName);
+        constructor
+                .addParameter(getterType, "getter")
+                .addParameter(setterType, "setter");
+
+        constructorBody
+                .addStatement("this." + getterFieldName + " = " + "getter")
+                .addStatement("this." + setterFieldName + " = " + "setter");
+
+        jpaColumnsClass.addMethod(constructor.addCode(constructorBody.build()).build());
+
+        addFieldWithReadAccessor(jpaColumnsClass, pkFieldName, pkArgType, "pk", false);
+        addFieldWithReadAccessor(jpaColumnsClass, pathFieldName, pathArgType, "path", false);
+
+        populateTypeAwareClass(jpaColumnsClass, nameFieldName, typeFieldName, nameArgType, typeArgType);
+
+        addGetter(jpaColumnsClass, beanType, typeVariable, getterType, getterFieldName);
+        addSetter(jpaColumnsClass, beanType, typeVariable, setterType, setterFieldName);
+
+        addValues(jpaColumnsClass, className, columnNames, uniqueNames);
+
+        out.addType(jpaColumnsClass.build());
         return out;
     }
 

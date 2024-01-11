@@ -34,10 +34,12 @@ public class UserEntityTest {
         var address = UserEntity.Address.builder()
                 .postalCode("123")
                 .build();
-        var bean = UserEntity.builder().id(1L).age(20).name("Bob").address(address).build();
+        var tags = new UserEntity.Tag[0];
+        var bean = UserEntity.builder().id(1L).age(20).name("Bob").address(address).tags(tags).build();
         assertEquals(1L, id.get(bean));
         assertEquals(20, age.get(bean));
         assertEquals("Bob", name.get(bean));
+        assertEquals(tags, UserEntityMeta.Prop.tags.get(bean));
         assertSame(address, UserEntityMeta.Prop.address.get(bean));
     }
 
@@ -58,7 +60,7 @@ public class UserEntityTest {
 
     @Test
     public void fieldsCompleteness() {
-        var expected = Set.of(age, id, name, address, legalAddress);
+        var expected = Set.of(age, id, name, address, legalAddress, tags);
         assertEquals(expected.size(), values().size());
         assertEquals(expected, Set.copyOf(values()));
     }
@@ -67,7 +69,7 @@ public class UserEntityTest {
     public void userEntityBuilderCompleteness() {
         var values = BuilderMeta.values();
         var expected = Set.of(BuilderMeta.age, BuilderMeta.id, BuilderMeta.name,
-                BuilderMeta.address, BuilderMeta.legalAddress);
+                BuilderMeta.address, BuilderMeta.legalAddress, BuilderMeta.tags);
         assertEquals(expected.size(), values.size());
         assertEquals(expected, Set.copyOf(values));
     }
@@ -81,6 +83,7 @@ public class UserEntityTest {
         BuilderMeta.age.set(builder, 20);
         BuilderMeta.name.set(builder, "name");
         BuilderMeta.address.set(builder, address);
+        BuilderMeta.tags.set(builder, new UserEntity.Tag[0]);
 
         var user = builder.build();
         assertEquals(1L, user.getId());
