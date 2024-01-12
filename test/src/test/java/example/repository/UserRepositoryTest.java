@@ -1,7 +1,7 @@
 package example.repository;
 
 import example.model.UserEntity;
-import matador.Typed;
+import metagen.Typed;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.CrudRepository;
 

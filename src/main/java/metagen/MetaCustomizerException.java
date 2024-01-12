@@ -1,4 +1,4 @@
-package matador;
+package metagen;
 
 import javax.lang.model.type.TypeMirror;
 

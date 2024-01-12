@@ -1,4 +1,4 @@
-package matador;
+package metagen;
 
 import lombok.Builder;
 import lombok.Data;

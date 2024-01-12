@@ -4,8 +4,8 @@ package example.model;
 import example.IdAware;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import matador.Meta;
-import matador.customizer.JpaColumns;
+import metagen.Meta;
+import metagen.customizer.JpaColumns;
 
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;

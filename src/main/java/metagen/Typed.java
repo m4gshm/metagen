@@ -1,4 +1,4 @@
-package matador;
+package metagen;
 
 public interface Typed<T> {
 

@@ -2,7 +2,7 @@ package example.model.dto;
 
 import lombok.Getter;
 import lombok.Setter;
-import matador.Meta;
+import metagen.Meta;
 
 @Meta
 public class AnyReadableWritableBean {

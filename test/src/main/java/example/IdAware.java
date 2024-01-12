@@ -1,6 +1,6 @@
 package example;
 
-import matador.Meta;
+import metagen.Meta;
 
 @Meta
 public interface IdAware<T> {

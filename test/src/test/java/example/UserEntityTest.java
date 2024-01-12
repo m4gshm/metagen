@@ -5,8 +5,8 @@ import example.model.UserEntity;
 import example.model.UserEntityMeta;
 import example.model.UserEntityMeta.BuilderMeta;
 import lombok.SneakyThrows;
-import matador.Meta;
-import matador.SuperParametersAware;
+import metagen.Meta;
+import metagen.SuperParametersAware;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

@@ -1,4 +1,4 @@
-package matador;
+package metagen;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;

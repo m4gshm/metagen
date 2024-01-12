@@ -3,7 +3,7 @@ package example.model;
 import example.IdAware;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
-import matador.Meta;
+import metagen.Meta;
 
 import javax.persistence.Column;
 import javax.persistence.Id;

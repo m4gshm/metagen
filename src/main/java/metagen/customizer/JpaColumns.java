@@ -1,12 +1,12 @@
-package matador.customizer;
+package metagen.customizer;
 
 import io.jbock.javapoet.*;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import matador.MetaBean;
-import matador.MetaBeanExtractor;
-import matador.MetaCustomizer;
-import matador.ReadWrite;
+import metagen.MetaBean;
+import metagen.MetaBeanExtractor;
+import metagen.MetaCustomizer;
+import metagen.ReadWrite;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
@@ -25,7 +25,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.*;
-import static matador.JavaPoetUtils.*;
+import static metagen.JavaPoetUtils.*;
 
 @RequiredArgsConstructor
 public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
@@ -274,7 +274,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         var jpaColumnsClass = typeAwareClass(className, typeVariable)
                 .addModifiers(FINAL)
                 .addSuperinterface(
-                        ParameterizedTypeName.get(ClassName.get(matador.jpa.Column.class), typeVariable)
+                        ParameterizedTypeName.get(ClassName.get(metagen.jpa.Column.class), typeVariable)
                 )
                 .addSuperinterface(
                         ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable)

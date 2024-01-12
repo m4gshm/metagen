@@ -59,9 +59,9 @@ publishing {
                     }
                 }
                 scm {
-                    connection.set("scm:git:https://github.com/m4gshm/matador.git")
-                    developerConnection.set("scm:git:https://github.com/m4gshm/matador.git")
-                    url.set("https://github.com/m4gshm/matador")
+                    connection.set("scm:git:https://github.com/m4gshm/metagen.git")
+                    developerConnection.set("scm:git:https://github.com/m4gshm/metagen.git")
+                    url.set("https://github.com/m4gshm/metagen")
                 }
             }
             from(components["java"])

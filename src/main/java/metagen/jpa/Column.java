@@ -1,6 +1,6 @@
-package matador.jpa;
+package metagen.jpa;
 
-import matador.Typed;
+import metagen.Typed;
 
 public interface Column<T> extends Typed<T> {
 

@@ -1,4 +1,4 @@
-package matador;
+package metagen;
 
 import io.jbock.javapoet.*;
 import lombok.SneakyThrows;
@@ -21,11 +21,11 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
-import static matador.JavaPoetUtils.dotClass;
-import static matador.JavaPoetUtils.initMapByEntries;
-import static matador.MetaBeanExtractor.getAggregatorName;
+import static metagen.JavaPoetUtils.dotClass;
+import static metagen.JavaPoetUtils.initMapByEntries;
+import static metagen.MetaBeanExtractor.getAggregatorName;
 
-@SupportedAnnotationTypes("matador.Meta")
+@SupportedAnnotationTypes("metagen.Meta")
 @SupportedSourceVersion(RELEASE_17)
 public class MetaAnnotationProcessor extends AbstractProcessor {
 

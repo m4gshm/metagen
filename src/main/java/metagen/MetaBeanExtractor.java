@@ -1,7 +1,7 @@
-package matador;
+package metagen;
 
 import lombok.RequiredArgsConstructor;
-import matador.MetaBean.BeanBuilder;
+import metagen.MetaBean.BeanBuilder;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;

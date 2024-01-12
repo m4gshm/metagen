@@ -1,7 +1,7 @@
 package example.model.dto;
 
 import lombok.Builder;
-import matador.Meta;
+import metagen.Meta;
 
 import java.util.Set;
 
