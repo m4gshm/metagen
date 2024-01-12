@@ -8,8 +8,6 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.MirroredTypeException;
 import javax.tools.JavaFileObject;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -21,6 +19,7 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
+import static metagen.ClassLoadUtility.load;
 import static metagen.JavaPoetUtils.dotClass;
 import static metagen.JavaPoetUtils.initMapByEntries;
 import static metagen.MetaBeanExtractor.getAggregatorName;
@@ -38,20 +37,10 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
 
     @SuppressWarnings("unchecked")
     private static MetaCustomizer<?> instantiate(Meta.Extend customizerInfo) {
-        Class<? extends MetaCustomizer<?>> customizerClass;
-        try {
-            customizerClass = customizerInfo.value();
-        } catch (MirroredTypeException e) {
-            var typeMirror = e.getTypeMirror();
-            if (typeMirror instanceof DeclaredType dt && dt.asElement() instanceof TypeElement te) {
-                customizerClass = (Class<? extends MetaCustomizer<?>>) load(te);
-            } else {
-                throw new MetaCustomizerException(typeMirror, e);
-            }
-        }
-
-        var optsMap = Arrays.stream(customizerInfo.opts())
-                .collect(toMap(Meta.Extend.Opt::key, Meta.Extend.Opt::value, (l, r) -> l));
+        var customizerClass = load(customizerInfo::value);
+        var optsMap = Arrays.stream(customizerInfo.opts()).collect(toMap(
+                Meta.Extend.Opt::key, Meta.Extend.Opt::value, (l, r) -> l)
+        );
 
         try {
             return customizerClass.getDeclaredConstructor(Map.class).newInstance(optsMap);
@@ -63,14 +52,6 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                      NoSuchMethodException e2) {
                 throw new MetaCustomizerException(customizerClass, e2);
             }
-        }
-    }
-
-    private static Class<?> load(TypeElement te) {
-        try {
-            return MetaAnnotationProcessor.class.getClassLoader().loadClass(te.getQualifiedName().toString());
-        } catch (ClassNotFoundException ex) {
-            throw new RuntimeException(ex);
         }
     }
 

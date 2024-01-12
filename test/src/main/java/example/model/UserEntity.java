@@ -14,6 +14,8 @@ import javax.persistence.Embedded;
 
 import static lombok.AccessLevel.NONE;
 import static lombok.AccessLevel.PUBLIC;
+import static metagen.customizer.JpaColumns.OPT_CLASS_NAME;
+import static metagen.customizer.JpaColumns.OPT_IMPLEMENTS;
 
 @Data
 @SuperBuilder
@@ -22,11 +24,10 @@ import static lombok.AccessLevel.PUBLIC;
         builder = @Meta.Builder(detect = true),
         customizers = @Meta.Extend(
                 value = JpaColumns.class,
-                opts = @Meta.Extend.Opt(
-                        key = "className",
-                        value = "Column"
-                )
-        )
+                opts = {
+                        @Meta.Extend.Opt(key = OPT_CLASS_NAME, value = "Column"),
+                        @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "metagen.jpa.Column"),
+                })
 )
 @javax.persistence.Entity
 public class UserEntity extends Entity<Long> implements IdAware<Long> {

@@ -3,10 +3,7 @@ package metagen.customizer;
 import io.jbock.javapoet.*;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import metagen.MetaBean;
-import metagen.MetaBeanExtractor;
-import metagen.MetaCustomizer;
-import metagen.ReadWrite;
+import metagen.*;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
@@ -15,11 +12,13 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Character.*;
+import static java.util.Arrays.stream;
 import static java.util.Collections.reverse;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
@@ -31,15 +30,18 @@ import static metagen.JavaPoetUtils.*;
 public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
     public static final String OPT_CLASS_NAME = "className";
+    public static final String OPT_IMPLEMENTS = "implements";
     public static final String OPT_GET_SUPERCLASS_COLUMNS = "getSuperclassColumns";
     public static final String OPT_CHECK_FOR_ENTITY_ANNOTATION = "checkForEntityAnnotation";
     public static final String[] DEFAULT_GET_SUPERCLASS_COLUMNS = new String[]{TRUE.toString()};
     public static final String[] DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = new String[]{FALSE.toString()};
     public static final String[] DEFAULT_CLASS_NAME = new String[]{"JpaColumn"};
+    public static final Class[] DEFAULT_IMPLEMENTS = new Class[]{metagen.jpa.Column.class};
 
     private final String className;
     private final boolean getSuperclassColumns;
     private final boolean checkForEntityAnnotation;
+    private final List<Class> implementInterfaces;
 
     public JpaColumns(Map<String, String[]> opts) {
         opts = opts != null ? opts : Map.of();
@@ -50,6 +52,10 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         this.checkForEntityAnnotation = opts.getOrDefault(
                 OPT_CHECK_FOR_ENTITY_ANNOTATION, DEFAULT_CHECK_FOR_ENTITY_ANNOTATION
         )[0].equals(TRUE.toString());
+
+        var impls = Stream.ofNullable(opts.get(OPT_IMPLEMENTS)).flatMap(Arrays::stream)
+                .map(fullClassName -> (Class) ClassLoadUtility.load(fullClassName)).toList();
+        this.implementInterfaces = impls.isEmpty() ? stream(DEFAULT_IMPLEMENTS).toList() : impls;
     }
 
     private static Map<String, Map<String, Object>> getAnnotationElements(List<? extends AnnotationMirror> annotations) {
@@ -86,8 +92,8 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         ) instanceof Collection<?> values ? values.stream().map(v -> v instanceof Map<?, ?> m ? m : null
         ).filter(Objects::nonNull).map(m -> {
             if (m.get("column") instanceof Map<?, ?> mc) {
-                Object name = m.get("name");
-                Object colName = mc.get("name");
+                var name = m.get("name");
+                var colName = mc.get("name");
                 return name != null && colName != null ? Map.entry(name.toString(), colName.toString()) : null;
             }
             return null;
@@ -273,12 +279,11 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
         var jpaColumnsClass = typeAwareClass(className, typeVariable)
                 .addModifiers(FINAL)
-                .addSuperinterface(
-                        ParameterizedTypeName.get(ClassName.get(metagen.jpa.Column.class), typeVariable)
-                )
-                .addSuperinterface(
-                        ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable)
-                );
+                .addSuperinterface(ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable));
+        var interfaces = implementInterfaces.stream().map(iface ->
+                ParameterizedTypeName.get(ClassName.get(iface), typeVariable)
+        ).toList();
+        interfaces.forEach(jpaColumnsClass::addSuperinterface);
 
         var columnOverrides = getColumnOverrides(beanAnnotations.get("javax.persistence.AttributeOverrides"));
 

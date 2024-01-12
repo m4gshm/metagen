@@ -17,7 +17,9 @@ import java.util.function.Function;
 import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
+import static io.jbock.javapoet.TypeName.OBJECT;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
+import static io.jbock.javapoet.WildcardTypeName.subtypeOf;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.*;
@@ -81,7 +83,8 @@ public class JavaPoetUtils {
             var inheritedParamsField = FieldSpec.builder(
                     ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(Class.class),
                             ParameterizedTypeName.get(ClassName.get(List.class),
-                                    WildcardTypeName.subtypeOf(Typed.class))), fieldName, PUBLIC, FINAL
+                                    subtypeOf(wildcardParametrized(ClassName.get(Typed.class))))),
+                    fieldName, PUBLIC, FINAL
             );
             var inheritedParamsFieldInitializer = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
 
@@ -127,7 +130,7 @@ public class JavaPoetUtils {
                 builder.addField(inheritedParamsField.build());
                 builder.addMethod(returnListMethodBuilder(
                         interfacesParams.methodName(),
-                        WildcardTypeName.subtypeOf(Typed.class),
+                        subtypeOf(wildcardParametrized(ClassName.get(Typed.class))),
                         inheritParamsOf,
                         CodeBlock.builder().addStatement("return $L.get(type)", fieldName).build()
                 ).addParameter(ParameterSpec.builder(Class.class, "type").build()).build());
@@ -539,9 +542,9 @@ public class JavaPoetUtils {
                 .addStatement("this." + typeName + " = " + "type");
     }
 
-    static MethodSpec callValuesMethod(String name, TypeName typeClassName, boolean overr) {
+    static MethodSpec callValuesMethod(String name, ClassName typeClassName, boolean overr) {
         return returnListMethodBuilder(
-                name, typeClassName, overr,
+                name, wildcardParametrized(typeClassName), overr,
                 CodeBlock.builder().addStatement("return $T.values()", typeClassName).build()
         ).build();
     }
@@ -622,16 +625,30 @@ public class JavaPoetUtils {
     public static TypeSpec.Builder addValues(
             TypeSpec.Builder builder, ClassName typeName, Collection<String> values, Set<String> uniqueNames
     ) {
+
         var valuesField = getUniqueName("values", uniqueNames);
+        var wildcard = wildcardParametrized(typeName);
         return builder
-                .addField(listField(valuesField, typeName, CodeBlock.builder()
-                        .add(values.stream().reduce((l, r) -> l + (!l.isEmpty() ? ", " : "") + r)
-                                .orElse("")).build(), PRIVATE, FINAL, STATIC)
+                .addField(
+                        listField(valuesField, wildcard, CodeBlock.builder()
+                                .add(values.stream().reduce((l, r) -> l + (!l.isEmpty() ? ", " : "") + r).orElse(""))
+                                .build(), PRIVATE, FINAL, STATIC)
                 )
-                .addMethod(MethodSpec.methodBuilder("values")
-                        .addModifiers(PUBLIC, FINAL, STATIC)
-                        .returns(ParameterizedTypeName.get(ClassName.get(List.class), typeName))
-                        .addStatement("return " + valuesField).build());
+                .addMethod(
+                        MethodSpec.methodBuilder("values")
+                                .addModifiers(PUBLIC, FINAL, STATIC)
+                                .returns(
+                                        ParameterizedTypeName.get(
+                                                ClassName.get(List.class),
+                                                wildcard
+                                        )
+                                )
+                                .addStatement("return " + valuesField).build()
+                );
+    }
+
+    private static ParameterizedTypeName wildcardParametrized(ClassName typeName) {
+        return ParameterizedTypeName.get(typeName, subtypeOf(OBJECT));
     }
 
     static void addInheritedParams(

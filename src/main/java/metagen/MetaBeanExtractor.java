@@ -230,7 +230,6 @@ public class MetaBeanExtractor {
         return ta1 == ta2;
     }
 
-
     private static ArrayList<BeanBuilder.Setter> getBuilderSetters(
             Messager messager, TypeElement typeElement, BeanBuilder superBuilder) {
         var setters = new ArrayList<BeanBuilder.Setter>();
@@ -240,7 +239,6 @@ public class MetaBeanExtractor {
         while (element != null && !isObjectType(element)) {
             var typeParameters = extractGenericParams(element, declaredType);
             var builderElements = element.getEnclosedElements();
-//            messager.printMessage(OTHER, "builderElements size " + builderElements.size() + ", for " + element + ", kind " + element.asType().getKind() + ", root element " + typeElement);
             for (var enclosedElement : builderElements) {
                 var modifiers = enclosedElement.getModifiers();
                 var isPublic = modifiers.contains(PUBLIC);
