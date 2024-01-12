@@ -33,23 +33,23 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     public static final String OPT_CLASS_NAME = "className";
     public static final String OPT_GET_SUPERCLASS_COLUMNS = "getSuperclassColumns";
     public static final String OPT_CHECK_FOR_ENTITY_ANNOTATION = "checkForEntityAnnotation";
-    public static final String DEFAULT_GET_SUPERCLASS_COLUMNS = TRUE.toString();
-    public static final String DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = FALSE.toString();
-    public static final String DEFAULT_CLASS_NAME = "JpaColumn";
+    public static final String[] DEFAULT_GET_SUPERCLASS_COLUMNS = new String[]{TRUE.toString()};
+    public static final String[] DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = new String[]{FALSE.toString()};
+    public static final String[] DEFAULT_CLASS_NAME = new String[]{"JpaColumn"};
 
     private final String className;
     private final boolean getSuperclassColumns;
     private final boolean checkForEntityAnnotation;
 
-    public JpaColumns(Map<String, String> opts) {
+    public JpaColumns(Map<String, String[]> opts) {
         opts = opts != null ? opts : Map.of();
-        this.className = opts.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME);
+        this.className = opts.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME)[0];
         this.getSuperclassColumns = opts.getOrDefault(
                 OPT_GET_SUPERCLASS_COLUMNS, DEFAULT_GET_SUPERCLASS_COLUMNS
-        ).equals(TRUE.toString());
+        )[0].equals(TRUE.toString());
         this.checkForEntityAnnotation = opts.getOrDefault(
                 OPT_CHECK_FOR_ENTITY_ANNOTATION, DEFAULT_CHECK_FOR_ENTITY_ANNOTATION
-        ).equals(TRUE.toString());
+        )[0].equals(TRUE.toString());
     }
 
     private static Map<String, Map<String, Object>> getAnnotationElements(List<? extends AnnotationMirror> annotations) {
@@ -273,6 +273,9 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
         var jpaColumnsClass = typeAwareClass(className, typeVariable)
                 .addModifiers(FINAL)
+                .addSuperinterface(
+                        ParameterizedTypeName.get(ClassName.get(matador.jpa.Column.class), typeVariable)
+                )
                 .addSuperinterface(
                         ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable)
                 );

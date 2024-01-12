@@ -104,8 +104,7 @@ public @interface Meta {
         @interface Opt {
             String key();
 
-            String value();
+            String[] value();
         }
-
     }
 }
