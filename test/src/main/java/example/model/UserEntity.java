@@ -21,7 +21,7 @@ import static metagen.customizer.JpaColumns.OPT_IMPLEMENTS;
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 @Meta(
-        builder = @Meta.Builder(detect = true),
+        builder = @Meta.Builder(generateMeta = true),
         customizers = @Meta.Extend(
                 value = JpaColumns.class,
                 opts = {

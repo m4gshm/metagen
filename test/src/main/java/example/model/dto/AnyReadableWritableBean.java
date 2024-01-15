@@ -1,10 +1,15 @@
 package example.model.dto;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import lombok.experimental.SuperBuilder;
 import metagen.Meta;
 
-@Meta
+import java.util.List;
+
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+@Meta(builder = @Meta.Builder(generateMeta = true))
 public class AnyReadableWritableBean {
 
     @Getter
@@ -16,6 +21,10 @@ public class AnyReadableWritableBean {
 
     @Getter
     private int accumulated;
+
+    @Getter
+    @Setter
+    private List<String> appendable;
 
     public void setAccumulate(int add) {
         accumulated += add;

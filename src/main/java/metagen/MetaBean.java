@@ -22,6 +22,10 @@ public class MetaBean {
     private Meta meta;
     private BeanBuilder beanBuilderInfo;
 
+    public List<MetaBean.Property> getPublicProperties() {
+        return this.getProperties().stream().filter(MetaBean.Property::isPublic).toList();
+    }
+
     public String getClassName() {
         return type.getSimpleName().toString();
     }
@@ -60,6 +64,7 @@ public class MetaBean {
         private TypeMirror type;
         private TypeMirror evaluatedType;
         private List<AnnotationMirror> annotations;
+        private MetaBean bean;
 
         public boolean isPublic() {
             return (field != null && isPublicField) || setter != null || getter != null || recordComponent != null;

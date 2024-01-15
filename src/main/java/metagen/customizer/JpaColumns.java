@@ -4,13 +4,13 @@ import io.jbock.javapoet.*;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import metagen.*;
+import metagen.MetaBean.BeanBuilder;
+import metagen.MetaBean.BeanBuilder.Setter;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -24,30 +24,32 @@ import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.*;
+import static javax.tools.Diagnostic.Kind.OTHER;
 import static metagen.JavaPoetUtils.*;
+import static metagen.MetaBeanExtractor.isEquals;
 
 @RequiredArgsConstructor
 public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
     public static final String OPT_CLASS_NAME = "className";
     public static final String OPT_IMPLEMENTS = "implements";
-    public static final String OPT_GET_SUPERCLASS_COLUMNS = "getSuperclassColumns";
+    public static final String OPT_WITH_SUPERCLASS_COLUMNS = "withSuperclassColumns";
     public static final String OPT_CHECK_FOR_ENTITY_ANNOTATION = "checkForEntityAnnotation";
-    public static final String[] DEFAULT_GET_SUPERCLASS_COLUMNS = new String[]{TRUE.toString()};
+    public static final String[] DEFAULT_WITH_SUPERCLASS_COLUMNS = new String[]{TRUE.toString()};
     public static final String[] DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = new String[]{FALSE.toString()};
     public static final String[] DEFAULT_CLASS_NAME = new String[]{"JpaColumn"};
     public static final Class[] DEFAULT_IMPLEMENTS = new Class[]{metagen.jpa.Column.class};
 
     private final String className;
-    private final boolean getSuperclassColumns;
+    private final boolean withSuperclassColumns;
     private final boolean checkForEntityAnnotation;
     private final List<Class> implementInterfaces;
 
     public JpaColumns(Map<String, String[]> opts) {
         opts = opts != null ? opts : Map.of();
         this.className = opts.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME)[0];
-        this.getSuperclassColumns = opts.getOrDefault(
-                OPT_GET_SUPERCLASS_COLUMNS, DEFAULT_GET_SUPERCLASS_COLUMNS
+        this.withSuperclassColumns = opts.getOrDefault(
+                OPT_WITH_SUPERCLASS_COLUMNS, DEFAULT_WITH_SUPERCLASS_COLUMNS
         )[0].equals(TRUE.toString());
         this.checkForEntityAnnotation = opts.getOrDefault(
                 OPT_CHECK_FOR_ENTITY_ANNOTATION, DEFAULT_CHECK_FOR_ENTITY_ANNOTATION
@@ -77,18 +79,15 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     }
 
     private static Object evalValue(Object value) {
-        if (value instanceof AnnotationMirror annotationMirror) {
-            return evalValues(annotationMirror.getElementValues());
-        } else if (value instanceof Collection<?> collection) {
-            return collection.stream().map(JpaColumns::evalValue).toList();
-        } else {
-            return value;
-        }
+        return value instanceof AnnotationMirror annotationMirror
+                ? evalValues(annotationMirror.getElementValues())
+                : value instanceof Collection<?> collection
+                ? collection.stream().map(JpaColumns::evalValue).toList()
+                : value;
     }
 
     private static Map<String, String> getColumnOverrides(Map<String, Object> attributeOverrides) {
-        return (
-                attributeOverrides != null ? attributeOverrides.get("value") : null
+        return (attributeOverrides != null ? attributeOverrides.get("value") : null
         ) instanceof Collection<?> values ? values.stream().map(v -> v instanceof Map<?, ?> m ? m : null
         ).filter(Objects::nonNull).map(m -> {
             if (m.get("column") instanceof Map<?, ?> mc) {
@@ -100,24 +99,25 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         }).filter(Objects::nonNull).collect(toMap(Map.Entry::getKey, Map.Entry::getValue)) : Map.of();
     }
 
-    private static String addColumnConst(Column column, ClassName className, TypeSpec.Builder jpaColumnsClass) {
-        final CodeBlock getterArgCode;
-        final CodeBlock setterArgCode;
-        final TypeName type;
+    private static String addColumnConst(Column column, ClassName className, TypeSpec.Builder jpaColumnsClass,
+                                         boolean addSetter, boolean allBuildable) {
+        final CodeBlock getterArgCode, setterArgCode;
+        var type = TypeName.get(column.property().getEvaluatedType());
+        var beanBuilder = column.beanBuilder();
+        var builderType = beanBuilder != null ? beanBuilder.getType() : null;
+        var parametrizedBuilderType = beanBuilder != null ? wildcardParametrized(beanBuilder.getType()) : null;
 
         var path = column.path();
         var straightPath = new ArrayList<>(path);
         reverse(straightPath);
 
-        var pathAmount = path.size();
+        var pathAmount = straightPath.size();
         if (pathAmount > 1) {
             var uniqueNames = new HashSet<String>();
 
             var valueParam = getUniqueName("value", uniqueNames);
             var beanParam = getUniqueName("bean", uniqueNames);
-
             var callableName = getUniqueName("bean", uniqueNames);
-            type = TypeName.get(path.get(0).getEvaluatedType());
 
             var getterArgCodeB = CodeBlock.builder();
             var setterArgCodeB = CodeBlock.builder();
@@ -146,8 +146,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                 } else {
 //                    var code = getGetterCallCode(callableName, publicField, field, record, getter);
                     var code = getGetterCallInitByNewCode(
-                            "v", callableName, publicField, field,
-                            getter, setter, uniqueNames
+                            "v", callableName, publicField, field, getter, setter, uniqueNames
                     );
                     var intermediateGetterPartCode = requireNonNull(code, () -> "No public read accessor part '" +
                             propertyName + "' for column '" + column.name() + "'"
@@ -162,8 +161,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             setterArgCode = CodeBlock.builder().add("($L, $L) -> $T.of($L)$L", beanParam, valueParam,
                     Optional.class, beanParam, setterArgCodeB.build()).build();
         } else {
-            var property = path.get(0);
-            type = TypeName.get(property.getEvaluatedType());
+            var property = column.property();
 
             var uniqueNames = new HashSet<String>();
             var beanParamName = getUniqueName("bean", uniqueNames);
@@ -173,22 +171,42 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             var field = property.getField();
             var record = property.getRecordComponent();
             getterArgCode = getGetterCallCode(beanParamName, publicField, field, record, property.getGetter());
-            setterArgCode = getSetterCallCode(
-                    beanParamName, valueParamName, publicField, field, record, property.getSetter()
-            );
+            setterArgCode = getSetterCallCode(beanParamName, valueParamName, publicField, field, record, property.getSetter());
         }
 
-        var fieldType = ParameterizedTypeName.get(className, getUnboxedTypeVarName(type));
+        var fieldType = allBuildable
+                ? ParameterizedTypeName.get(className, unboxedTypeVarName(type), parametrizedBuilderType)
+                : ParameterizedTypeName.get(className, unboxedTypeVarName(type));
+
         var name = column.name();
         var strPath = straightPath.stream().map(MetaBean.Property::getName).reduce((l, r) -> l + "." + r).orElse("");
+        var uniqueNames = new HashSet<String>();
+
+        var builderParamName = getUniqueName("builder", uniqueNames);
+        var valueParamName = getUniqueName("value", uniqueNames);
+
+        var constructorArgs = enumConstructorArgs(name, dotClass(type), getterArgCode, addSetter ? setterArgCode : null);
+        if (allBuildable) {
+            constructorArgs.add(", $L", dotClass(ClassName.get(builderType)));
+
+            var setter = column.setter();
+            var builderSetter = getSetterCallCode(
+                    builderParamName, valueParamName, false, null, null, setter.getSetter()
+            );
+            constructorArgs.add(", ").add(builderSetter);
+        }
 
         var enumConstructorArgs = CodeBlock.builder().add(" " + column.pk() + ", ").add("\"" + strPath + "\", ").add(
-                enumConstructorArgs(name, dotClass(type), getterArgCode, setterArgCode)
+                constructorArgs.build()
         ).build();
 
         jpaColumnsClass.addField(FieldSpec.builder(fieldType, name, PUBLIC, STATIC, FINAL)
-                .initializer(newInstanceCall(className, enumConstructorArgs))
+                .initializer(allBuildable
+                        ? newInstanceCall(className, unboxedTypeVarName(type), parametrizedBuilderType, enumConstructorArgs)
+                        : newInstanceCall(className, unboxedTypeVarName(type), enumConstructorArgs)
+                )
                 .build());
+
         return name;
     }
 
@@ -210,101 +228,140 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         return builder.toString();
     }
 
-    private static List<Column> getColumns(Messager messager, MetaBean bean, Map<String, String> columnOverrides) {
-        var columns = new ArrayList<Column>();
-        for (var property : bean.getProperties()) {
-            var propAnnotations = getAnnotationElements(property.getAnnotations());
-            var _transient = propAnnotations.get("javax.persistence.Transient");
-            var embedded = propAnnotations.get("javax.persistence.Embedded");
-            var embeddedId = propAnnotations.get("javax.persistence.EmbeddedId");
-            var id = propAnnotations.get("javax.persistence.Id");
-            var column = propAnnotations.get("javax.persistence.Column");
+    private static List<Column> getColumns(Messager messager, MetaBean bean, Map<String, String> columnOverrides, BeanBuilder builderInfo) {
+        var builderSetters = builderInfo != null ? builderInfo.getSetters() : List.<Setter>of();
+        var setters = builderInfo != null
+                ? builderSetters.stream().collect(toMap(Setter::getName, s -> s))
+                : Map.<String, Setter>of();
+
+        return bean.getProperties().stream().flatMap(property -> {
+            var name = property.getName();
+            var type = property.getEvaluatedType();
+
+            var possibleBuilderSetter = setters.get(name);
+            if (possibleBuilderSetter != null && !isEquals(possibleBuilderSetter.getEvaluatedType(), type)) {
+                possibleBuilderSetter = null;
+            }
+
+            var annotations = getAnnotationElements(property.getAnnotations());
+            var _transient = annotations.get("javax.persistence.Transient");
+            var embedded = annotations.get("javax.persistence.Embedded");
+            var embeddedId = annotations.get("javax.persistence.EmbeddedId");
 
             if (_transient != null) {
-                continue;
-            }
-
-            if (embedded != null || embeddedId != null) {
+                return Stream.empty();
+            } else if (embedded != null || embeddedId != null) {
                 var embeddedColumns = getEmbeddedColumns(messager, property, getColumnOverrides(
-                        propAnnotations.get("javax.persistence.AttributeOverrides"))
+                        annotations.get("javax.persistence.AttributeOverrides"))
                 );
-                columns.addAll(embeddedId == null ? embeddedColumns
-                        : embeddedColumns.stream().map(c -> c.toBuilder().pk(true).build()).toList()
-                );
+                return embeddedId == null ? embeddedColumns.stream()
+                        : embeddedColumns.stream().map(c -> c.toBuilder().pk(true).build());
             } else {
-                var columnBuilder = Column.builder();
-                if (id != null) {
-                    columnBuilder.pk(true);
-                }
-                var name = ofNullable(column).map(c -> c.get("name"))
-                        .map(Object::toString)
-                        .or(() -> ofNullable(columnOverrides).map(m -> m.get(property.getName())))
-                        .orElseGet(() -> toColumnName(property.getName()));
-                columnBuilder.name(name);
-                columnBuilder.path(List.of(property));
-                columns.add(columnBuilder.build());
+                return Stream.of(newColumn(
+                        annotations.get("javax.persistence.Id") != null,
+                        property, builderInfo, possibleBuilderSetter,
+                        annotations.get("javax.persistence.Column"),
+                        columnOverrides));
             }
-        }
-        return columns;
+        }).toList();
+    }
+
+    private static Column newColumn(boolean pk, MetaBean.Property property,
+                                    BeanBuilder builder, Setter setter,
+                                    Map<String, Object> columnAttributes,
+                                    Map<String, String> columnOverrides) {
+        return Column.builder()
+                .pk(pk).setter(setter).beanBuilder(builder)
+                .name(getColumnName(property.getName(), columnAttributes, columnOverrides))
+                .path(List.of(property))
+                .build();
+    }
+
+    private static String getColumnName(String propertyName,
+                                        Map<String, Object> columnAttributes,
+                                        Map<String, String> columnOverrides) {
+        return ofNullable(columnAttributes).map(c -> c.get("name"))
+                .map(Object::toString)
+                .or(() -> ofNullable(columnOverrides).map(m -> m.get(propertyName)))
+                .orElseGet(() -> toColumnName(propertyName));
     }
 
     private static List<Column> getEmbeddedColumns(
             Messager messager, MetaBean.Property property, Map<String, String> columnOverrides
     ) {
-        var type = property.getEvaluatedType();
-        if (type instanceof DeclaredType dt && dt.asElement() instanceof TypeElement te) {
-            var embeddedBean = new MetaBeanExtractor(messager).getBean(te);
-            return getColumns(messager, embeddedBean, columnOverrides).stream().map(embeddedColumn -> {
-                var oldPath = embeddedColumn.path();
-                var newPath = new ArrayList<MetaBean.Property>();
-                if (oldPath != null) {
-                    newPath.addAll(oldPath);
-                }
-                newPath.add(property);
-                return embeddedColumn.toBuilder().path(newPath).build();
-            }).toList();
-        }
-        throw new UnsupportedOperationException("unsupported embedded type, property '" + property.getName() + "', type '" + type + "'");
+        return ofNullable(property.getBean()).map(embeddedBean -> getColumns(messager, embeddedBean, columnOverrides, embeddedBean.getBeanBuilderInfo())
+                .stream().map(embeddedColumn -> {
+                    var oldPath = embeddedColumn.path();
+                    var newPath = new ArrayList<MetaBean.Property>();
+                    if (oldPath != null) {
+                        newPath.addAll(oldPath);
+                    }
+                    newPath.add(property);
+                    return embeddedColumn.toBuilder().path(newPath).build();
+                }).toList()
+        ).orElseThrow(() -> new UnsupportedOperationException("unsupported embedded type, property '" +
+                property.getName() + "', type '" + property.getType() + "'"));
     }
 
     @Override
     public TypeSpec.Builder customize(Messager messager, MetaBean bean, TypeSpec.Builder out) {
-        var beanType = ClassName.get(bean.getType());
-        var beanAnnotations = getAnnotationElements(bean.getType().getAnnotationMirrors());
+        var beanType = bean.getType();
+        var beanClass = ClassName.get(beanType);
+        var beanAnnotations = getAnnotationElements(beanType.getAnnotationMirrors());
         if (this.checkForEntityAnnotation && beanAnnotations.get("javax.persistence.Entity") != null) {
             return out;
         }
         var className = ClassName.get("", this.className);
         var typeVariable = TypeVariableName.get("T");
+        var builderTypeVariable = TypeVariableName.get("B");
 
-        var jpaColumnsClass = typeAwareClass(className, typeVariable)
-                .addModifiers(FINAL)
-                .addSuperinterface(ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable));
-        var interfaces = implementInterfaces.stream().map(iface ->
-                ParameterizedTypeName.get(ClassName.get(iface), typeVariable)
-        ).toList();
-        interfaces.forEach(jpaColumnsClass::addSuperinterface);
+        var jpaColumnsClass = typeAwareClass(className, typeVariable).addModifiers(FINAL);
+
+        implementInterfaces.stream().map(iface -> ParameterizedTypeName.get(ClassName.get(iface), typeVariable))
+                .forEach(jpaColumnsClass::addSuperinterface);
 
         var columnOverrides = getColumnOverrides(beanAnnotations.get("javax.persistence.AttributeOverrides"));
 
         var columnNames = new LinkedHashSet<String>();
-        var columns = getColumns(messager, bean, columnOverrides);
+        var builderInfo = bean.getBeanBuilderInfo();
+        var columns = new ArrayList<>(getColumns(messager, bean, columnOverrides, builderInfo));
 
-        if (this.getSuperclassColumns) {
+        if (this.withSuperclassColumns) {
             var parentColumnOverrides = new LinkedHashMap<>(columnOverrides);
             var superclass = bean.getSuperclass();
             while (superclass != null) {
                 var superclassAnnotations = getAnnotationElements(superclass.getType().getAnnotationMirrors());
                 var superclassColumnOverrides = getColumnOverrides(superclassAnnotations.get("javax.persistence.AttributeOverrides"));
                 parentColumnOverrides.putAll(superclassColumnOverrides);
-                var superclassColumns = getColumns(messager, superclass, parentColumnOverrides);
+                var superclassColumns = getColumns(messager, superclass, parentColumnOverrides, builderInfo);
                 superclass = superclass.getSuperclass();
                 columns.addAll(superclassColumns);
             }
         }
 
+        var allWriteable = true;
+        var allBuildable = true;
         for (var column : columns) {
-            columnNames.add(addColumnConst(column, className, jpaColumnsClass));
+            allWriteable &= isWriteable(column.property());
+            var setter = column.setter();
+            var settable = setter != null;
+            if (!settable) {
+                messager.printMessage(OTHER, "column no settable, " + column.name + ", " + bean.getName());
+            }
+            allBuildable &= settable;
+        }
+
+        allBuildable &= !allWriteable;
+
+        if (allBuildable) {
+            jpaColumnsClass.addTypeVariable(builderTypeVariable);
+        }
+        jpaColumnsClass.addSuperinterface(allWriteable
+                ? ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanClass, typeVariable)
+                : ParameterizedTypeName.get(ClassName.get(Read.class), beanClass, typeVariable));
+
+        for (var column : columns) {
+            columnNames.add(addColumnConst(column, className, jpaColumnsClass, allWriteable, allBuildable));
         }
 
         var uniqueNames = new HashSet<>(columnNames);
@@ -324,9 +381,13 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
         var getterFieldName = getUniqueName("getter", uniqueNames);
         var setterFieldName = getUniqueName("setter", uniqueNames);
+        var builderTypeFieldName = getUniqueName("builderType", uniqueNames);
+        var builderSetterFieldName = getUniqueName("builderSetter", uniqueNames);
 
-        var getterType = getFunctionType(beanType, typeVariable);
-        var setterType = getBiConsumerType(beanType, typeVariable);
+        var getterType = getFunctionType(beanClass, typeVariable);
+        var setterType = getBiConsumerType(beanClass, typeVariable);
+        var builderType = builderTypeVariable;
+        var builderSetterType = getBiConsumerType(builderTypeVariable, typeVariable);
 
         constructor
                 .addParameter(pkArgType, "pk")
@@ -336,13 +397,21 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                 .addStatement("this." + pathFieldName + " = " + "path");
 
         populateConstructor(constructor, constructorBody, nameArgType, nameFieldName, typeArgType, typeFieldName);
-        constructor
-                .addParameter(getterType, "getter")
-                .addParameter(setterType, "setter");
 
-        constructorBody
-                .addStatement("this." + getterFieldName + " = " + "getter")
-                .addStatement("this." + setterFieldName + " = " + "setter");
+        constructor.addParameter(getterType, "getter");
+        constructorBody.addStatement("this." + getterFieldName + " = " + "getter");
+
+        if (allWriteable) {
+            constructor.addParameter(setterType, "setter");
+            constructor.addStatement("this." + setterFieldName + " = " + "setter");
+        }
+        if (allBuildable) {
+//            jpaColumnsClass.addField(FieldSpec.builder(builderType, builderTypeFieldName).addModifiers(PUBLIC, FINAL).build());
+            constructor.addParameter(typeClassOf(builderType), "builderType");
+
+            constructor.addParameter(builderSetterType, "builderSetter");
+            constructor.addStatement("this." + builderSetterFieldName + " = " + "builderSetter");
+        }
 
         jpaColumnsClass.addMethod(constructor.addCode(constructorBody.build()).build());
 
@@ -351,16 +420,26 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
         populateTypeAwareClass(jpaColumnsClass, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
-        addGetter(jpaColumnsClass, beanType, typeVariable, getterType, getterFieldName);
-        addSetter(jpaColumnsClass, beanType, typeVariable, setterType, setterFieldName);
+        addGetter(jpaColumnsClass, beanClass, typeVariable, getterType, getterFieldName);
+        if (allWriteable) {
+            addSetter(jpaColumnsClass, beanClass, typeVariable, setterType, setterFieldName, "set", "bean", true);
+        }
+        if (allBuildable) {
+            addSetter(jpaColumnsClass, builderTypeVariable, typeVariable, builderSetterType, builderSetterFieldName, "apply", "builder", false);
+        }
 
-        addValues(jpaColumnsClass, className, columnNames, uniqueNames);
+        addValues(jpaColumnsClass, className, columnNames, allBuildable ? 2 : 1, uniqueNames);
 
         out.addType(jpaColumnsClass.build());
         return out;
     }
 
     @Builder(toBuilder = true)
-    public record Column(String name, boolean pk, List<MetaBean.Property> path) {
+    public record Column(String name, boolean pk, List<MetaBean.Property> path, BeanBuilder beanBuilder,
+                         Setter setter) {
+        public MetaBean.Property property() {
+            return path.get(0);
+        }
+
     }
 }

@@ -91,7 +91,8 @@ public @interface Meta {
 
         String className() default CLASS_NAME;
 
-        boolean detect() default false;
+        boolean detect() default true;
+        boolean generateMeta() default false;
     }
 
     @Retention(SOURCE)
