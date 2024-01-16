@@ -2,8 +2,10 @@ package example;
 
 import example.model.Model;
 import example.model.UserEntity;
+import example.model.UserEntityAddressMeta;
 import example.model.UserEntityMeta;
 import example.model.UserEntityMeta.BuilderMeta;
+import example.model.UserEntityMeta.Column;
 import lombok.SneakyThrows;
 import metagen.Meta;
 import metagen.SuperParametersAware;
@@ -34,13 +36,14 @@ public class UserEntityTest {
         var address = UserEntity.Address.builder()
                 .postalCode("123")
                 .build();
-        var tags = new UserEntity.Tag[0];
+        var tags = new UserEntity.Tag[]{UserEntity.Tag.builder().tagValue("tag").build()};
         var bean = UserEntity.builder().id(1L).age(20).name("Bob").address(address).tags(tags).build();
         assertEquals(1L, id.get(bean));
         assertEquals(20, age.get(bean));
         assertEquals("Bob", name.get(bean));
-        assertEquals(tags, UserEntityMeta.Prop.tags.get(bean));
+        assertArrayEquals(tags, UserEntityMeta.Prop.tags.get(bean));
         assertSame(address, UserEntityMeta.Prop.address.get(bean));
+        assertEquals("123", UserEntityAddressMeta.Prop.postalCode.get(address));
     }
 
     @Test
@@ -95,8 +98,32 @@ public class UserEntityTest {
     @Test
     @SneakyThrows
     public void jpaAnnotations() {
-//        UserEntity.class.getMethod(id.name()).getAnnotation(Column.class);
-//        select(UserEntityMeta.Columns).from(UserEntityMeta.Annotations.Table.name);
+        var src = UserEntity.builder().id(1L).age(20).name("Bob")
+                .address(UserEntity.Address.builder()
+                        .postalCode("123")
+                        .city("Neb")
+                        .build())
+                .legalAddress(UserEntity.Address.builder()
+                        .street("Centr. st")
+                        .build())
+                .tags(new UserEntity.Tag[]{
+                        UserEntity.Tag.builder()
+                                .tagValue("tag")
+                                .build()
+                })
+                .build();
+
+        var dest = UserEntity.builder().build();
+
+        Column.ID.set(dest, Column.ID.get(src));
+        Column.AG_E.set(dest, Column.AG_E.get(src));
+        Column.NAME.set(dest, Column.NAME.get(src));
+        Column.TAGS.set(dest, Column.TAGS.get(src));
+        Column.CITY.set(dest, Column.CITY.get(src));
+        Column.POSTAL_CODE.set(dest, Column.POSTAL_CODE.get(src));
+        Column.LEGAL_STREET.set(dest, Column.LEGAL_STREET.get(src));
+
+        assertEquals(src, dest);
     }
 }
 

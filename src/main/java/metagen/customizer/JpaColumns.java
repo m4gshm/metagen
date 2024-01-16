@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
+import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Character.*;
@@ -406,8 +407,11 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             constructor.addStatement("this." + setterFieldName + " = " + "setter");
         }
         if (allBuildable) {
-//            jpaColumnsClass.addField(FieldSpec.builder(builderType, builderTypeFieldName).addModifiers(PUBLIC, FINAL).build());
+            jpaColumnsClass.addField(FieldSpec.builder(typeClassOf(builderType), builderTypeFieldName)
+                            .addModifiers(PUBLIC, FINAL).build());
+
             constructor.addParameter(typeClassOf(builderType), "builderType");
+            constructor.addStatement("this." + builderTypeFieldName + " = " + "builderType");
 
             constructor.addParameter(builderSetterType, "builderSetter");
             constructor.addStatement("this." + builderSetterFieldName + " = " + "builderSetter");
@@ -425,6 +429,13 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             addSetter(jpaColumnsClass, beanClass, typeVariable, setterType, setterFieldName, "set", "bean", true);
         }
         if (allBuildable) {
+            var typeGetter = methodBuilder("builderType")
+                    .addModifiers(PUBLIC, FINAL)
+                    .returns(typeClassOf(builderType))
+                    .addCode(CodeBlock.builder()
+                            .addStatement("return " + builderTypeFieldName)
+                            .build());
+            jpaColumnsClass.addMethod(typeGetter.build());
             addSetter(jpaColumnsClass, builderTypeVariable, typeVariable, builderSetterType, builderSetterFieldName, "apply", "builder", false);
         }
 
