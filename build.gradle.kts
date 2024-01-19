@@ -2,6 +2,7 @@ plugins {
 //    kotlin("jvm")
     `java-library`
     `maven-publish`
+    id("org.asciidoctor.jvm.convert") version "3.1.0"
 }
 
 group = "com.github.m4gshm"

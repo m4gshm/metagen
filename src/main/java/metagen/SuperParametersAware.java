@@ -2,6 +2,6 @@ package metagen;
 
 import java.util.List;
 
-public interface SuperParametersAware {
-    List<? extends Typed> superParameters();
+public interface SuperParametersAware<T> {
+    List<? extends Typed<?>> superParameters();
 }

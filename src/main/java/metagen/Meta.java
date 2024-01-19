@@ -6,6 +6,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.ElementType.PACKAGE;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
+import static metagen.Meta.EnumType.FULL;
 
 @Target({TYPE, PACKAGE})
 @Retention(SOURCE)
@@ -14,9 +15,9 @@ public @interface Meta {
 
     String suffix() default META;
 
-    Properties properties() default @Properties();
+    Props properties() default @Props();
 
-    Parameters params() default @Parameters();
+    Params params() default @Params();
 
     Builder builder() default @Builder();
 
@@ -24,12 +25,19 @@ public @interface Meta {
 
     Extend[] customizers() default {};
 
+    enum EnumType {
+        NONE,
+        NAME,
+        TYPE,
+        FULL
+    }
+
     @Retention(SOURCE)
-    @interface Properties {
+    @interface Props {
         String METHOD_NAME = "properties";
         String CLASS_NAME = "Prop";
 
-        boolean enumerate() default true;
+        EnumType value() default FULL;
 
         String className() default CLASS_NAME;
 
@@ -37,11 +45,11 @@ public @interface Meta {
     }
 
     @Retention(SOURCE)
-    @interface Parameters {
+    @interface Params {
         String METHOD_NAME = "parameters";
         String CLASS_NAME = "Param";
 
-        boolean enumerate() default true;
+        EnumType value() default FULL;
 
         String className() default CLASS_NAME;
 

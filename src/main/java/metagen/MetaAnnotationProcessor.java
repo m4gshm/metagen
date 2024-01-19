@@ -15,8 +15,7 @@ import java.util.*;
 
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.*;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
 import static metagen.ClassLoadUtility.load;
@@ -66,7 +65,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                 .filter(Objects::nonNull)
                 .map(extractor::getBean)
                 .filter(Objects::nonNull)
-                .collect(groupingBy(MetaBean::getPackageName));
+                .collect(groupingBy(MetaBean::getPackageName, LinkedHashMap::new, toList()));
 
         var metamodels = new HashMap<String, List<MetaBean>>();
         beansByPackage.forEach((pack, beans) -> {
@@ -74,7 +73,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             metamodels.put(pack, packMetamodels);
             for (var bean : beans) {
                 var customizers = Arrays.stream(bean.getMeta().customizers())
-                        .map((Meta.Extend customizerInfo) -> instantiate(customizerInfo))
+                        .map(MetaAnnotationProcessor::instantiate)
                         .toList();
 
                 var typeSpec = JavaPoetUtils.newTypeBuilder(messager, bean, customizers).build();

@@ -2,8 +2,8 @@ package metagen;
 
 import java.util.List;
 
-public interface ParametersAware {
-    List<? extends Typed> parameters();
+public interface ParametersAware<T> {
+    List<? extends Typed<?>> parameters();
 
-    List<? extends Typed> parametersOf(Class<?> inheritedType);
+    List<? extends Typed<?>> parametersOf(Class<?> inheritedType);
 }
