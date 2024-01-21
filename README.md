@@ -34,7 +34,7 @@ public class User implements IdAware<Long> {
     private Integer version; // excluded private field
 
     @Data
-    @Meta(properties = @Props(NAME), params = @Params(EnumType.NONE))
+    @Meta(properties = @Props(NAME))
     public static class Address {
         private final String postalCode;
         private final String city;
@@ -65,9 +65,8 @@ import java.lang.Long;
 import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
-import metagen.Meta;
 
-@Generated("Meta")
+@Generated("metagen.Meta")
 public final class UserMeta {
   UserMeta() {
   }
@@ -100,10 +99,12 @@ package example.simple;
 import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
-import metagen.Meta;
+import metagen.ParametersAware;
 
-@Generated("Meta")
-public final class UserAddressMeta {
+@Generated("metagen.Meta")
+public final class UserAddressMeta implements ParametersAware<User.Address> {
+  public static final UserAddressMeta instance = new UserAddressMeta();
+
   UserAddressMeta() {
   }
 

@@ -26,7 +26,7 @@ public class User implements IdAware<Long> {
     private Integer version; // excluded private field
 
     @Data
-    @Meta(properties = @Props(NAME), params = @Params(EnumType.NONE))
+    @Meta(properties = @Props(NAME))
     public static class Address {
         private final String postalCode;
         private final String city;

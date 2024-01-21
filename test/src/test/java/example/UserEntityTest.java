@@ -1,6 +1,8 @@
 package example;
 
-import example.model.*;
+import example.model.UserEntity;
+import example.model.UserEntityAddressMeta;
+import example.model.UserEntityMeta;
 import example.model.UserEntityMeta.BuilderMeta;
 import example.model.UserEntityMeta.Column;
 import lombok.SneakyThrows;
@@ -21,7 +23,8 @@ public class UserEntityTest {
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
         assertEquals(UserEntityMeta.Prop.values(), metaModel.properties());
-        assertEquals(UserEntityMeta.Param.values(), metaModel.parameters());
+        assertTrue(metaModel.parameters().isEmpty());
+//        assertEquals(UserEntityMeta.Param.values(), metaModel.parameters());
         assertEquals(UserEntityMeta.EntityParam.values(), metaModel.parametersOf(Meta.Params.Inherited.Super.class));
         assertEquals(UserEntityMeta.EntityParam.values(), ((SuperParametersAware) metaModel).superParameters());
     }

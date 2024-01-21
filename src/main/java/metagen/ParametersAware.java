@@ -3,7 +3,11 @@ package metagen;
 import java.util.List;
 
 public interface ParametersAware<T> {
-    List<? extends Typed<?>> parameters();
+    default List<? extends Typed<?>> parameters() {
+        return List.of();
+    }
 
-    List<? extends Typed<?>> parametersOf(Class<?> inheritedType);
+    default List<? extends Typed<?>> parametersOf(Class<?> inheritedType) {
+        return null;
+    }
 }

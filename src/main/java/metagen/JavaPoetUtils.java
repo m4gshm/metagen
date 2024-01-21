@@ -27,15 +27,15 @@ import static javax.lang.model.element.Modifier.*;
 import static metagen.Meta.EnumType.*;
 
 public class JavaPoetUtils {
-    public static TypeSpec.Builder newTypeBuilder(
+    public static TypeSpec.Builder newMetaTypeBuilder(
             Messager messager, MetaBean bean, Collection<? extends MetaCustomizer> customizers
     ) {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
 
-        var addFieldsEnum = props.map(Meta.Props::value).orElse(FULL);
-        var addParamsEnum = parameters.map(Meta.Params::value).orElse(FULL);
+        var propsEnum = props.map(Meta.Props::value).orElse(FULL);
+        var paramsEnum = parameters.map(Meta.Params::value).orElse(FULL);
 
         var beanType = ClassName.get(bean.getType());
 
@@ -65,8 +65,8 @@ public class JavaPoetUtils {
         var inheritParamsOf = false;
         var superclass = bean.getSuperclass();
         var interfaces = bean.getInterfaces();
-        if (addParamsEnum != NONE) {
-            if (addParamsEnum == FULL || addFieldsEnum == FULL) {
+        if (paramsEnum != NONE) {
+            if (paramsEnum == FULL || propsEnum == FULL) {
                 builder.addField(FieldSpec.builder(
                         ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
                 ).initializer(CodeBlock.of("new $L()", name)).build());
@@ -75,41 +75,36 @@ public class JavaPoetUtils {
             var params = parameters.get();
             var typeName = getUniqueName(params.className(), uniqueNames);
             var methodName = params.methodName();
-            inheritParams = Meta.Params.METHOD_NAME.equals(methodName) && addParamsEnum == FULL;
+
+            inheritParams = Meta.Params.METHOD_NAME.equals(methodName) && paramsEnum == FULL;
 
             var typeParameters = bean.getTypeParameters();
-            if (addParamsEnum == FULL || !typeParameters.isEmpty()) {
-                builder.addType(newParamsType(typeName, typeParameters, addParamsEnum));
-            }
-            if (addParamsEnum == FULL) {
-                //todo move after fields added
-                builder.addMethod(
-                        callValuesMethod(methodName,
-                                ClassName.get("", typeName),
-                                wildcardParametrized(ClassName.get("", typeName), 1),
-                                inheritParams)
-                );
+            var addParamsType = !typeParameters.isEmpty();
+            if (addParamsType) {
+                builder.addType(newParamsType(typeName, typeParameters, paramsEnum));
             }
 
-            var fieldName = "inheritedParams";
+            var inheritedParamsFieldName = "inheritedParams";
             var inheritedParamsField = FieldSpec.builder(
                     ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(Class.class),
                             ParameterizedTypeName.get(ClassName.get(List.class),
                                     subtypeOf(wildcardParametrized(ClassName.get(Typed.class), 1)))),
-                    fieldName, PUBLIC, FINAL
+                    inheritedParamsFieldName, PUBLIC, FINAL
             );
+
             var inheritedParamsFieldInitializer = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
 
             var inherited = params.inherited();
             var parentClass = inherited != null ? inherited.parentClass() : null;
-            var addSuperParams = superclass != null && parentClass != null && parentClass.enumerate();
+            var superTypeParams = superclass != null ? superclass.getTypeParameters() : List.<Param>of();
+            var addSuperParams = !superTypeParams.isEmpty() && parentClass != null && parentClass.enumerate();
             if (addSuperParams) {
-                inheritSuperParams = Meta.Params.Inherited.Super.METHOD_NAME.equals(parentClass.methodName()) && addParamsEnum == FULL;
+                inheritSuperParams = Meta.Params.Inherited.Super.METHOD_NAME.equals(parentClass.methodName()) && paramsEnum == FULL;
                 var superTypeName = getUniqueName(
                         superclass.getClassName() + parentClass.classNameSuffix(), uniqueNames
                 );
-                builder.addType(newParamsType(superTypeName, superclass.getTypeParameters(), addParamsEnum));
-                if (addParamsEnum == FULL) {
+                builder.addType(newParamsType(superTypeName, superTypeParams, paramsEnum));
+                if (paramsEnum == FULL) {
                     builder.addMethod(callValuesMethod(
                             parentClass.methodName(),
                             ClassName.get("", superTypeName),
@@ -129,14 +124,14 @@ public class JavaPoetUtils {
                 );
             }
             var interfacesParams = inherited != null ? inherited.interfaces() : null;
-            if (interfacesParams != null && interfaces != null && interfacesParams.enumerate()) {
-                inheritParamsOf = Meta.Params.Inherited.Interfaces.METHOD_NAME.equals(interfacesParams.methodName()) && addParamsEnum == FULL;
+            if (interfacesParams != null && interfaces != null && !interfaces.isEmpty() && interfacesParams.enumerate()) {
+                inheritParamsOf = Meta.Params.Inherited.Interfaces.METHOD_NAME.equals(interfacesParams.methodName()) && paramsEnum == FULL;
                 for (int i = 0; i < interfaces.size(); i++) {
                     var iface = interfaces.get(i);
                     var ifaceParametersEnumName = getUniqueName(
                             iface.getClassName() + interfacesParams.classNameSuffix(), uniqueNames
                     );
-                    builder.addType(newParamsType(ifaceParametersEnumName, iface.getTypeParameters(), addParamsEnum));
+                    builder.addType(newParamsType(ifaceParametersEnumName, iface.getTypeParameters(), paramsEnum));
                     addInheritedParams(
                             inheritedParamsFieldInitializer,
                             ClassName.get(iface.getType()),
@@ -144,25 +139,34 @@ public class JavaPoetUtils {
                             addSuperParams || i > 0);
                 }
                 inheritedParamsField.initializer(inheritedParamsFieldInitializer.add("\n)").build());
-                if (addParamsEnum == FULL) {
+                if (paramsEnum == FULL) {
                     builder.addField(inheritedParamsField.build());
                     builder.addMethod(returnListMethodBuilder(
                             interfacesParams.methodName(),
                             subtypeOf(wildcardParametrized(ClassName.get(Typed.class), 1)),
-                            CodeBlock.builder().addStatement("return $L.get(type)", fieldName).build(), inheritParamsOf
+                            CodeBlock.builder().addStatement("return $L.get(type)", inheritedParamsFieldName).build(), inheritParamsOf
                     ).addParameter(ParameterSpec.builder(Class.class, "type").build()).build());
                 }
+            }
+
+            if (addParamsType) {
+                builder.addMethod(
+                        callValuesMethod(methodName,
+                                ClassName.get("", typeName),
+                                wildcardParametrized(ClassName.get("", typeName), 1),
+                                inheritParams)
+                );
             }
         }
 
         var inheritProps = false;
-        if (addFieldsEnum != NONE) {
+        if (propsEnum != NONE) {
             var fieldLevelUniqueNames = new HashSet<String>();
             var propsInfo = props.get();
-            inheritProps = Meta.Props.METHOD_NAME.equals(propsInfo.methodName()) && addFieldsEnum == FULL;
+            inheritProps = Meta.Props.METHOD_NAME.equals(propsInfo.methodName()) && propsEnum == FULL;
             var typeName = ClassName.get("", getUniqueName(propsInfo.className(), uniqueNames));
             var typeVariable = TypeVariableName.get("T");
-            var fieldsClassBuilder = addFieldsEnum == FULL
+            var fieldsClassBuilder = propsEnum == FULL
                     ? typeAwareClass(typeName, typeVariable)
                     : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
 
@@ -267,12 +271,14 @@ public class JavaPoetUtils {
 //                }
 
                 var paramTypeName = TypeName.get(property.getEvaluatedType());
-                var fieldSpec = switch (addFieldsEnum) {
+                var fieldSpec = switch (propsEnum) {
                     case FULL -> newPropertyConstant(typ, property.getName(),
                             paramTypeName, property.getField(), property.isPublicField(), property.getGetter(),
                             property.getSetter(), property.getRecordComponent());
-                    case NAME -> staticField(property.getName(), ClassName.get(String.class)).initializer("\"$L\"", property.getName());
-                    case TYPE -> staticField(property.getName(),typeClassOf(paramTypeName)).initializer(dotClass(paramTypeName));
+                    case NAME ->
+                            staticField(property.getName(), ClassName.get(String.class)).initializer("\"$L\"", property.getName());
+                    case TYPE ->
+                            staticField(property.getName(), typeClassOf(paramTypeName)).initializer(dotClass(paramTypeName));
                     default -> null;
                 };
                 if (fieldSpec != null) {
@@ -280,7 +286,7 @@ public class JavaPoetUtils {
                 }
             }
 
-            if (addFieldsEnum == FULL) {
+            if (propsEnum == FULL) {
                 var readWriteInterface = ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable);
                 var writeInterface = writeInterface(beanType, typeVariable);
                 var readInterface = ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
@@ -387,7 +393,7 @@ public class JavaPoetUtils {
                 }
             }
             builder.addType(fieldsClassBuilder.build());
-            if (addFieldsEnum == FULL) {
+            if (propsEnum == FULL) {
                 builder.addMethod(callValuesMethod(
                         propsInfo.methodName(),
                         typeName,
@@ -400,7 +406,8 @@ public class JavaPoetUtils {
         if (inheritMetamodel) {
             typeGetter.addAnnotation(Override.class);
         }
-        if (addParamsEnum == FULL && addFieldsEnum == FULL) {
+
+        if (paramsEnum == FULL && propsEnum == FULL) {
             builder.addField(typeField);
             builder.addMethod(typeGetter.build());
         }
@@ -410,7 +417,7 @@ public class JavaPoetUtils {
                     ClassName.get(MetaModel.class), beanType
             ));
         } else {
-            if (inheritParams && inheritParamsOf) {
+            if (inheritParams || inheritParamsOf) {
                 builder.addSuperinterface(ParameterizedTypeName.get(ClassName.get(ParametersAware.class), beanType));
             }
             if (inheritProps) {
@@ -937,6 +944,6 @@ public class JavaPoetUtils {
     }
 
     static AnnotationSpec generatedAnnotation() {
-        return AnnotationSpec.builder(Generated.class).addMember("value", "\"$T\"", ClassName.get(Meta.class)).build();
+        return AnnotationSpec.builder(Generated.class).addMember("value", "\"$L\"", ClassName.get(Meta.class).canonicalName()).build();
     }
 }

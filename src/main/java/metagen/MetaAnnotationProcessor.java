@@ -75,7 +75,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                         .map(MetaAnnotationProcessor::instantiate)
                         .toList();
 
-                var typeSpec = JavaPoetUtils.newTypeBuilder(messager, bean, customizers).build();
+                var typeSpec = JavaPoetUtils.newMetaTypeBuilder(messager, bean, customizers).build();
                 if (isInheritMetamodel(typeSpec)) {
                     packMetamodels.add(bean);
                 }
