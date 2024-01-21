@@ -1,9 +1,12 @@
-package metagen;
+package meta;
 
 import io.jbock.javapoet.*;
 import lombok.SneakyThrows;
 
-import javax.annotation.processing.*;
+import javax.annotation.processing.AbstractProcessor;
+import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
 import java.io.PrintWriter;
@@ -16,12 +19,12 @@ import static io.jbock.javapoet.TypeSpec.classBuilder;
 import static java.util.stream.Collectors.*;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
-import static metagen.ClassLoadUtility.load;
-import static metagen.JavaPoetUtils.*;
-import static metagen.MetaBeanExtractor.getAggregatorName;
-import static metagen.MetaBeanExtractor.getPackageClass;
+import static meta.ClassLoadUtility.load;
+import static meta.JavaPoetUtils.*;
+import static meta.MetaBeanExtractor.getAggregatorName;
+import static meta.MetaBeanExtractor.getPackageClass;
 
-@SupportedAnnotationTypes("metagen.Meta")
+@SupportedAnnotationTypes("meta.Meta")
 @SupportedSourceVersion(RELEASE_17)
 public class MetaAnnotationProcessor extends AbstractProcessor {
 
@@ -45,9 +48,11 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                  NoSuchMethodException e) {
             try {
                 return customizerClass.getDeclaredConstructor().newInstance();
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
-                     NoSuchMethodException e2) {
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException e2) {
                 throw new MetaCustomizerException(customizerClass, e2);
+            } catch (NoSuchMethodException e2) {
+                e.addSuppressed(e2);
+                throw new MetaCustomizerException(customizerClass, e);
             }
         }
     }

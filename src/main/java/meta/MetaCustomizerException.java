@@ -1,4 +1,4 @@
-package metagen;
+package meta;
 
 import javax.lang.model.type.TypeMirror;
 

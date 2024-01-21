@@ -1,11 +1,11 @@
-package metagen.customizer;
+package meta.customizer;
 
 import io.jbock.javapoet.*;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import metagen.*;
-import metagen.MetaBean.BeanBuilder;
-import metagen.MetaBean.BeanBuilder.Setter;
+import meta.*;
+import meta.MetaBean.BeanBuilder;
+import meta.MetaBean.BeanBuilder.Setter;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
@@ -26,8 +26,8 @@ import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.*;
 import static javax.tools.Diagnostic.Kind.OTHER;
-import static metagen.JavaPoetUtils.*;
-import static metagen.MetaBeanExtractor.isEquals;
+import static meta.JavaPoetUtils.*;
+import static meta.MetaBeanExtractor.isEquals;
 
 @RequiredArgsConstructor
 public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
@@ -39,7 +39,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     public static final String[] DEFAULT_WITH_SUPERCLASS_COLUMNS = new String[]{TRUE.toString()};
     public static final String[] DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = new String[]{FALSE.toString()};
     public static final String[] DEFAULT_CLASS_NAME = new String[]{"JpaColumn"};
-    public static final Class[] DEFAULT_IMPLEMENTS = new Class[]{metagen.jpa.Column.class};
+    public static final Class[] DEFAULT_IMPLEMENTS = new Class[]{meta.jpa.Column.class};
 
     private final String className;
     private final boolean withSuperclassColumns;

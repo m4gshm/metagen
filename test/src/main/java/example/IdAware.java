@@ -1,6 +1,6 @@
 package example;
 
-import metagen.Meta;
+import meta.Meta;
 
 import java.io.Serializable;
 

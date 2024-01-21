@@ -6,8 +6,8 @@ import example.model.UserEntityMeta;
 import example.model.UserEntityMeta.BuilderMeta;
 import example.model.UserEntityMeta.Column;
 import lombok.SneakyThrows;
-import metagen.Meta;
-import metagen.SuperParametersAware;
+import meta.Meta;
+import meta.SuperParametersAware;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

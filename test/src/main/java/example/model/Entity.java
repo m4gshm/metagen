@@ -3,13 +3,13 @@ package example.model;
 import example.IdAware;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
-import metagen.Meta;
+import meta.Meta;
 
 import javax.persistence.Column;
 import javax.persistence.Id;
 import java.io.Serializable;
 
-import static metagen.Meta.EnumType.NONE;
+import static meta.Meta.EnumType.NONE;
 
 @Data
 @SuperBuilder

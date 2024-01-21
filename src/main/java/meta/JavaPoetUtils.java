@@ -1,8 +1,8 @@
-package metagen;
+package meta;
 
 import io.jbock.javapoet.*;
-import metagen.Meta.EnumType;
-import metagen.MetaBean.Param;
+import meta.Meta.EnumType;
+import meta.MetaBean.Param;
 
 import javax.annotation.processing.Generated;
 import javax.annotation.processing.Messager;
@@ -24,7 +24,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.IntStream.range;
 import static javax.lang.model.element.Modifier.*;
-import static metagen.Meta.EnumType.*;
+import static meta.Meta.EnumType.*;
 
 public class JavaPoetUtils {
     public static TypeSpec.Builder newMetaTypeBuilder(

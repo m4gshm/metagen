@@ -4,14 +4,13 @@ package example.simple;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
-import metagen.Meta;
-import metagen.Meta.EnumType;
-import metagen.Meta.Params;
-import metagen.Meta.Props;
+import meta.Meta;
+import meta.Meta.Params;
+import meta.Meta.Props;
 
 import static lombok.AccessLevel.NONE;
-import static metagen.Meta.EnumType.NAME;
-import static metagen.Meta.EnumType.TYPE;
+import static meta.Meta.EnumType.NAME;
+import static meta.Meta.EnumType.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))

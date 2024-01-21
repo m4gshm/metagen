@@ -12,14 +12,13 @@ package example.simple;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
-import metagen.Meta;
-import metagen.Meta.EnumType;
-import metagen.Meta.Params;
-import metagen.Meta.Props;
+import meta.Meta;
+import meta.Meta.Params;
+import meta.Meta.Props;
 
 import static lombok.AccessLevel.NONE;
-import static metagen.Meta.EnumType.NAME;
-import static metagen.Meta.EnumType.TYPE;
+import static meta.Meta.EnumType.NAME;
+import static meta.Meta.EnumType.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))
@@ -32,7 +31,8 @@ public class User implements IdAware<Long> {
     @Getter(NONE)
     @Setter(NONE)
     private Integer version; // excluded private field
-
+ 
+ 
     @Data
     @Meta(properties = @Props(NAME))
     public static class Address {
@@ -46,7 +46,7 @@ public class User implements IdAware<Long> {
 ``` java
 package example.simple;
 
-import metagen.Meta;
+import meta.Meta;
 
 @Meta
 public interface IdAware<ID> {
@@ -66,7 +66,7 @@ import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
 
-@Generated("metagen.Meta")
+@Generated("meta.Meta")
 public final class UserMeta {
   UserMeta() {
   }
@@ -99,9 +99,9 @@ package example.simple;
 import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
-import metagen.ParametersAware;
+import meta.ParametersAware;
 
-@Generated("metagen.Meta")
+@Generated("meta.Meta")
 public final class UserAddressMeta implements ParametersAware<User.Address> {
   public static final UserAddressMeta instance = new UserAddressMeta();
 

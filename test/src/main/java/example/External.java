@@ -1,7 +1,7 @@
 package example;
 
 import lombok.Data;
-import metagen.Meta;
+import meta.Meta;
 
 public class External {
 

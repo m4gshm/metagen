@@ -1,4 +1,4 @@
-package metagen;
+package meta;
 
 public interface Typed<T> {
 

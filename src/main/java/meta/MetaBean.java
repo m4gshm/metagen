@@ -1,4 +1,4 @@
-package metagen;
+package meta;
 
 import lombok.Builder;
 import lombok.Data;

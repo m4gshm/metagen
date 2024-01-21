@@ -1,6 +1,6 @@
-package metagen.jpa;
+package meta.jpa;
 
-import metagen.Typed;
+import meta.Typed;
 
 public interface Column<T> extends Typed<T> {
 

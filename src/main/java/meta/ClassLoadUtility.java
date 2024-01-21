@@ -1,4 +1,4 @@
-package metagen;
+package meta;
 
 import lombok.experimental.UtilityClass;
 
@@ -33,7 +33,7 @@ public class ClassLoadUtility {
         try {
             return MetaAnnotationProcessor.class.getClassLoader().loadClass(fullClassName);
         } catch (ClassNotFoundException ex) {
-            throw new RuntimeException(ex);
+            throw new RuntimeException("class not found: " + fullClassName, ex);
         }
     }
 }

@@ -1,6 +1,6 @@
 package example.simple;
 
-import metagen.Meta;
+import meta.Meta;
 
 @Meta
 public interface IdAware<ID> {

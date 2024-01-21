@@ -1,8 +1,8 @@
 package example.model.dto;
 
 import lombok.Builder;
-import metagen.Meta;
-import metagen.customizer.JpaColumns;
+import meta.Meta;
+import meta.customizer.JpaColumns;
 
 import java.util.Set;
 

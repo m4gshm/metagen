@@ -4,8 +4,8 @@ package example.model;
 import example.IdAware;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import metagen.Meta;
-import metagen.customizer.JpaColumns;
+import meta.Meta;
+import meta.customizer.JpaColumns;
 
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;
@@ -14,8 +14,8 @@ import javax.persistence.Embedded;
 
 import static lombok.AccessLevel.NONE;
 import static lombok.AccessLevel.PUBLIC;
-import static metagen.customizer.JpaColumns.OPT_CLASS_NAME;
-import static metagen.customizer.JpaColumns.OPT_IMPLEMENTS;
+import static meta.customizer.JpaColumns.OPT_CLASS_NAME;
+import static meta.customizer.JpaColumns.OPT_IMPLEMENTS;
 
 @Data
 @SuperBuilder
@@ -26,7 +26,7 @@ import static metagen.customizer.JpaColumns.OPT_IMPLEMENTS;
                 value = JpaColumns.class,
                 opts = {
                         @Meta.Extend.Opt(key = OPT_CLASS_NAME, value = "Column"),
-                        @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "metagen.jpa.Column"),
+                        @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "meta.jpa.Column"),
                 })
 )
 @javax.persistence.Entity

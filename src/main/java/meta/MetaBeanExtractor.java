@@ -1,7 +1,7 @@
-package metagen;
+package meta;
 
 import lombok.RequiredArgsConstructor;
-import metagen.MetaBean.BeanBuilder;
+import meta.MetaBean.BeanBuilder;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
@@ -16,7 +16,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 import static javax.tools.Diagnostic.Kind.WARNING;
-import static metagen.JavaPoetUtils.getUniqueName;
+import static meta.JavaPoetUtils.getUniqueName;
 
 @RequiredArgsConstructor
 public class MetaBeanExtractor {

@@ -2,7 +2,7 @@ package example.model.dto;
 
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import metagen.Meta;
+import meta.Meta;
 
 import java.util.List;
 
