@@ -1,0 +1,22 @@
+= Metagen
+
+== Metagen (under construction)
+
+Enumerated constants generator based on bean properties and type parameters.
+
+Input:
+[source,java]
+----
+include::../../../test/src/main/java/example/model/simple/UserBean.java[]
+----
+
+Output:
+Input:
+[source,java]
+----
+include::../../../test/build/generated/sources/annotationProcessor/java/main/example/model/simple/UserBeanMeta.java[]
+----
+----
+include::../../../test/build/generated/sources/annotationProcessor/java/main/example/model/simple/UserBeanAddressMeta.java[]
+----
+

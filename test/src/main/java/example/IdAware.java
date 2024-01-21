@@ -5,7 +5,7 @@ import metagen.Meta;
 import java.io.Serializable;
 
 @Meta
-public interface IdAware<T extends Serializable> {
+public interface IdAware<ID extends Serializable> {
 
-    T getId();
+    ID getId();
 }

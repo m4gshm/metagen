@@ -1,12 +1,11 @@
 plugins {
-//    kotlin("jvm")
     `java-library`
     `maven-publish`
-    id("org.asciidoctor.jvm.convert") version "3.1.0"
+    id("org.asciidoctor.jvm.convert") version "4.0.1"
 }
 
 group = "com.github.m4gshm"
-version = "0.1-SNAPSHOT"
+version = "0.0.1-SNAPSHOT"
 
 allprojects {
     repositories {
@@ -21,11 +20,10 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok:1.18.30")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.30")
 
-    api("io.github.jbock-java:javapoet:1.15")
+    implementation("io.github.jbock-java:javapoet:1.15")
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-//    implementation(kotlin("stdlib-jdk8"))
 }
 
 tasks.test {
@@ -33,17 +31,32 @@ tasks.test {
 }
 
 tasks.compileJava {
-    this.options.isVerbose = true
+    options.isVerbose = true
 }
-//kotlin {
-//    jvmToolchain(17)
-//}
 
 java {
     withSourcesJar()
     targetCompatibility = JavaVersion.VERSION_17
     sourceCompatibility = JavaVersion.VERSION_17
     modularity.inferModulePath.set(true)
+}
+
+tasks.asciidoctor {
+    dependsOn(":test:classes")
+    baseDirFollowsSourceFile()
+    outputOptions {
+        backends("docbook")
+    }
+}
+
+tasks.create<Exec>("pandoc") {
+    dependsOn("asciidoctor")
+    group = "documentation"
+    commandLine = "pandoc -f docbook -t gfm $buildDir/docs/asciidoc/readme.xml -o $rootDir/README.md".split(" ")
+}
+
+tasks.build{
+    dependsOn("pandoc")
 }
 
 publishing {
@@ -66,6 +79,11 @@ publishing {
                 }
             }
             from(components["java"])
+        }
+    }
+    repositories {
+        maven("file://$rootDir/../m4gshm.github.io/maven2") {
+            name = "GithubMavenRepo"
         }
     }
 }

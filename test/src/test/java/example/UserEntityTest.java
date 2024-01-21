@@ -1,9 +1,6 @@
 package example;
 
-import example.model.Model;
-import example.model.UserEntity;
-import example.model.UserEntityAddressMeta;
-import example.model.UserEntityMeta;
+import example.model.*;
 import example.model.UserEntityMeta.BuilderMeta;
 import example.model.UserEntityMeta.Column;
 import lombok.SneakyThrows;
@@ -14,12 +11,13 @@ import org.junit.jupiter.api.Test;
 import java.util.Set;
 
 import static example.model.UserEntityMeta.Prop.*;
+import static example.model._Model.instance;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class UserEntityTest {
     @Test
     public void userEntityFieldsEnum() {
-        var metaModel = Model.instance.of(UserEntity.class);
+        var metaModel = instance.of(UserEntity.class);
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
         assertEquals(UserEntityMeta.Prop.values(), metaModel.properties());
@@ -30,7 +28,7 @@ public class UserEntityTest {
 
     @Test
     public void userEntityFieldsReadByGetters() {
-        var metaModel = Model.instance.of(UserEntity.class);
+        var metaModel = instance.of(UserEntity.class);
         assertEquals(UserEntityMeta.class, metaModel.getClass());
 
         var address = UserEntity.Address.builder()
@@ -50,7 +48,7 @@ public class UserEntityTest {
     @SneakyThrows
     public void noEntityClassInModel() {
         var type = Class.forName("example.model.Entity");
-        var metaModel = Model.instance.of(type);
+        var metaModel = instance.of(type);
         assertNull(metaModel);
     }
 

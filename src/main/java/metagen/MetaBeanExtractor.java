@@ -16,6 +16,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 import static javax.tools.Diagnostic.Kind.WARNING;
+import static metagen.JavaPoetUtils.getUniqueName;
 
 @RequiredArgsConstructor
 public class MetaBeanExtractor {
@@ -54,6 +55,30 @@ public class MetaBeanExtractor {
     static TypeElement getExternalClass(TypeElement type) {
         var enclosingElement = type.getEnclosingElement();
         return enclosingElement instanceof TypeElement te ? te : null;
+    }
+
+    static String getClassName(Element e) {
+        var baseName = e.getSimpleName().toString();
+        if (e instanceof TypeElement te) {
+            var externalClass = getExternalClass(te);
+            if (externalClass != null) {
+                return getClassName(externalClass) + "." + baseName;
+            }
+        }
+        return baseName;
+    }
+
+    static PackageElement getPackageClass(Element element) {
+        var enclosingElement = element.getEnclosingElement();
+        while (enclosingElement != null) {
+            if (enclosingElement instanceof PackageElement pe) {
+                return pe;
+            } else if (enclosingElement instanceof TypeElement te && isObjectType(te)) {
+                return null;
+            }
+            enclosingElement = enclosingElement.getEnclosingElement();
+        }
+        return null;
     }
 
     static TypeInfo getTypeInfo(TypeMirror typeMirror) {
@@ -114,14 +139,16 @@ public class MetaBeanExtractor {
         }
     }
 
-    static String getAggregatorName(String beanPackage) {
+    static String getAggregatorName(String beanPackage, Map<String, List<String>> classNamePerPack) {
         final String prefix;
         if (beanPackage != null) {
+            var packElements = classNamePerPack.get(beanPackage);
             var delim = beanPackage.lastIndexOf('.');
             var packName = delim > 0 ? beanPackage.substring(delim + 1) : beanPackage;
             var letters = packName.toCharArray();
             letters[0] = Character.toUpperCase(letters[0]);
-            prefix = String.valueOf(letters);
+            var tmp = String.valueOf(letters);
+            prefix = getUniqueName(tmp, packElements);
         } else {
             prefix = "";
         }
@@ -435,9 +462,9 @@ public class MetaBeanExtractor {
         return metaBean;
     }
 
-   private void updateType(MetaBean.Property property, TypeMirror propType,
-                    List<MetaBean.Param> beanParameters,
-                    List<? extends AnnotationMirror> annotations, Meta meta, Map<TypeElement, MetaBean> touched) {
+    private void updateType(MetaBean.Property property, TypeMirror propType,
+                            List<MetaBean.Param> beanParameters,
+                            List<? extends AnnotationMirror> annotations, Meta meta, Map<TypeElement, MetaBean> touched) {
         var existType = property.getType();
         if (existType == null) {
             property.setType(propType);

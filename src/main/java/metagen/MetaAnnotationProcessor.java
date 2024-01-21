@@ -3,15 +3,13 @@ package metagen;
 import io.jbock.javapoet.*;
 import lombok.SneakyThrows;
 
-import javax.annotation.processing.AbstractProcessor;
-import javax.annotation.processing.RoundEnvironment;
-import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
+import javax.annotation.processing.*;
 import javax.lang.model.element.TypeElement;
 import javax.tools.JavaFileObject;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
@@ -19,9 +17,9 @@ import static java.util.stream.Collectors.*;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static javax.lang.model.element.Modifier.*;
 import static metagen.ClassLoadUtility.load;
-import static metagen.JavaPoetUtils.dotClass;
-import static metagen.JavaPoetUtils.initMapByEntries;
+import static metagen.JavaPoetUtils.*;
 import static metagen.MetaBeanExtractor.getAggregatorName;
+import static metagen.MetaBeanExtractor.getPackageClass;
 
 @SupportedAnnotationTypes("metagen.Meta")
 @SupportedSourceVersion(RELEASE_17)
@@ -57,6 +55,7 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
     @Override
     @SneakyThrows
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
+        var rootElements = roundEnv.getRootElements();
         var elements = roundEnv.getElementsAnnotatedWith(Meta.class);
         var messager = this.processingEnv.getMessager();
         var extractor = new MetaBeanExtractor(messager);
@@ -86,6 +85,11 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
             }
         });
 
+        var clasNamePerPack = rootElements.stream().collect(groupingBy(e -> {
+            var packageClass = getPackageClass(e);
+            return packageClass != null ? packageClass.toString() : "";
+        }, Collectors.mapping(MetaBeanExtractor::getClassName, toList())));
+
         metamodels.forEach((pack, beans) -> {
             var aggregate = beans.stream().filter(b -> b.getMeta().aggregate()).toList();
             if (!aggregate.isEmpty()) {
@@ -93,9 +97,10 @@ public class MetaAnnotationProcessor extends AbstractProcessor {
                         dotClass(ClassName.get(bean.getType())), "new " + bean.getName() + "()"
                 ).toString()).toList();
 
-                var typeName = getAggregatorName(pack);
+                var typeName = getAggregatorName(pack, clasNamePerPack);
                 var typeSpec = classBuilder(typeName)
                         .addModifiers(PUBLIC, FINAL)
+                        .addAnnotation(generatedAnnotation())
                         .addField(
                                 FieldSpec.builder(ClassName.get("", typeName), "instance", PUBLIC, STATIC, FINAL)
                                         .initializer(

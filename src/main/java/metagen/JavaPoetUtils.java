@@ -4,6 +4,7 @@ import io.jbock.javapoet.*;
 import metagen.Meta.EnumType;
 import metagen.MetaBean.Param;
 
+import javax.annotation.processing.Generated;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
@@ -53,6 +54,7 @@ public class JavaPoetUtils {
                 .build();
 
         var builder = classBuilder(name)
+                .addAnnotation(generatedAnnotation())
                 .addMethod(constructorBuilder().build())
                 .addModifiers(FINAL);
 
@@ -385,7 +387,7 @@ public class JavaPoetUtils {
                 }
             }
             builder.addType(fieldsClassBuilder.build());
-            if (addParamsEnum == FULL) {
+            if (addFieldsEnum == FULL) {
                 builder.addMethod(callValuesMethod(
                         propsInfo.methodName(),
                         typeName,
@@ -934,4 +936,7 @@ public class JavaPoetUtils {
         return init;
     }
 
+    static AnnotationSpec generatedAnnotation() {
+        return AnnotationSpec.builder(Generated.class).addMember("value", "\"$T\"", ClassName.get(Meta.class)).build();
+    }
 }
