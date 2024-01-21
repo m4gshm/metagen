@@ -31,8 +31,7 @@ public class User implements IdAware<Long> {
     @Getter(NONE)
     @Setter(NONE)
     private Integer version; // excluded private field
- 
- 
+
     @Data
     @Meta(properties = @Props(NAME))
     public static class Address {
@@ -103,8 +102,6 @@ import meta.ParametersAware;
 
 @Generated("meta.Meta")
 public final class UserAddressMeta implements ParametersAware<User.Address> {
-  public static final UserAddressMeta instance = new UserAddressMeta();
-
   UserAddressMeta() {
   }
 

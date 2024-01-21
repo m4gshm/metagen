@@ -66,12 +66,6 @@ public class JavaPoetUtils {
         var superclass = bean.getSuperclass();
         var interfaces = bean.getInterfaces();
         if (paramsEnum != NONE) {
-            if (paramsEnum == FULL || propsEnum == FULL) {
-                builder.addField(FieldSpec.builder(
-                        ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
-                ).initializer(CodeBlock.of("new $L()", name)).build());
-            }
-
             var params = parameters.get();
             var typeName = getUniqueName(params.className(), uniqueNames);
             var methodName = params.methodName();
@@ -408,6 +402,11 @@ public class JavaPoetUtils {
         }
 
         if (paramsEnum == FULL && propsEnum == FULL) {
+
+            builder.addField(FieldSpec.builder(
+                    ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
+            ).initializer(CodeBlock.of("new $L()", name)).build());
+
             builder.addField(typeField);
             builder.addMethod(typeGetter.build());
         }
