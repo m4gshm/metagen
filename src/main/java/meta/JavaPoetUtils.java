@@ -402,7 +402,6 @@ public class JavaPoetUtils {
         }
 
         if (paramsEnum == FULL && propsEnum == FULL) {
-
             builder.addField(FieldSpec.builder(
                     ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
             ).initializer(CodeBlock.of("new $L()", name)).build());
