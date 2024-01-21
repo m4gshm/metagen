@@ -9,6 +9,7 @@ Input:
 ----
 include::../../../test/src/main/java/example/simple/User.java[]
 ----
+[source,java]
 ----
 include::../../../test/src/main/java/example/simple/IdAware.java[]
 ----
@@ -18,6 +19,7 @@ Output:
 ----
 include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserMeta.java[]
 ----
+[source,java]
 ----
 include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserAddressMeta.java[]
 ----

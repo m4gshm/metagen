@@ -43,15 +43,17 @@ public class User implements IdAware<Long> {
 }
 ```
 
-    package example.simple;
+``` java
+package example.simple;
 
-    import metagen.Meta;
+import metagen.Meta;
 
-    @Meta
-    public interface IdAware<ID> {
+@Meta
+public interface IdAware<ID> {
 
-        ID getId();
-    }
+    ID getId();
+}
+```
 
 Output:
 
@@ -92,29 +94,31 @@ public final class UserMeta {
 }
 ```
 
-    package example.simple;
+``` java
+package example.simple;
 
-    import java.lang.String;
-    import java.util.List;
-    import javax.annotation.processing.Generated;
-    import metagen.Meta;
+import java.lang.String;
+import java.util.List;
+import javax.annotation.processing.Generated;
+import metagen.Meta;
 
-    @Generated("Meta")
-    public final class UserAddressMeta {
-      UserAddressMeta() {
-      }
+@Generated("Meta")
+public final class UserAddressMeta {
+  UserAddressMeta() {
+  }
 
-      public static class Prop {
-        public static final String postalCode = "postalCode";
+  public static class Prop {
+    public static final String postalCode = "postalCode";
 
-        public static final String city = "city";
+    public static final String city = "city";
 
-        public static final String street = "street";
+    public static final String street = "street";
 
-        private static final List<String> values = List.of(postalCode, city, street);
+    private static final List<String> values = List.of(postalCode, city, street);
 
-        public static final List<String> values() {
-          return values;
-        }
-      }
+    public static final List<String> values() {
+      return values;
     }
+  }
+}
+```
