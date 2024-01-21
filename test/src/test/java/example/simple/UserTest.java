@@ -1,14 +1,15 @@
-package example.model.simple;
+package example.simple;
 
-import example.model.simple.UserBeanMeta.IdAwareParam;
-import example.model.simple.UserBeanMeta.Prop;
+
+import example.simple.UserMeta.IdAwareParam;
+import example.simple.UserMeta.Prop;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class UserBeanTest {
+public class UserTest {
     @Test
     public void testProps() {
         assertEquals(Set.of(Prop.age, Prop.id, Prop.name, Prop.address), Set.copyOf(Prop.values()));

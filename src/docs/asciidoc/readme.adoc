@@ -7,16 +7,18 @@ Enumerated constants generator based on bean properties and type parameters.
 Input:
 [source,java]
 ----
-include::../../../test/src/main/java/example/model/simple/UserBean.java[]
+include::../../../test/src/main/java/example/simple/User.java[]
+----
+----
+include::../../../test/src/main/java/example/simple/IdAware.java[]
 ----
 
 Output:
-Input:
 [source,java]
 ----
-include::../../../test/build/generated/sources/annotationProcessor/java/main/example/model/simple/UserBeanMeta.java[]
+include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserMeta.java[]
 ----
 ----
-include::../../../test/build/generated/sources/annotationProcessor/java/main/example/model/simple/UserBeanAddressMeta.java[]
+include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserAddressMeta.java[]
 ----
 

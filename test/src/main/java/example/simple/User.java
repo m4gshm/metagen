@@ -1,21 +1,21 @@
-package example.model.simple;
+package example.simple;
 
 
-import example.IdAware;
-import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import metagen.Meta;
+import metagen.Meta.EnumType;
 import metagen.Meta.Params;
 import metagen.Meta.Props;
 
 import static lombok.AccessLevel.NONE;
-import static metagen.Meta.EnumType.*;
+import static metagen.Meta.EnumType.NAME;
+import static metagen.Meta.EnumType.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))
-public class UserBean implements IdAware<Long> {
+public class User implements IdAware<Long> {
 
     public Long id;
     public Address address;
@@ -23,10 +23,10 @@ public class UserBean implements IdAware<Long> {
     Integer age;
     @Getter(NONE)
     @Setter(NONE)
-    private Integer transientVersion;
+    private Integer version; // excluded private field
 
     @Data
-    @Meta(properties = @Props(NAME), params = @Params(Meta.EnumType.NONE))
+    @Meta(properties = @Props(NAME), params = @Params(EnumType.NONE))
     public static class Address {
         private final String postalCode;
         private final String city;

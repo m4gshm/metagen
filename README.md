@@ -6,24 +6,24 @@ parameters.
 Input:
 
 ``` java
-package example.model.simple;
+package example.simple;
 
 
-import example.IdAware;
-import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import metagen.Meta;
+import metagen.Meta.EnumType;
 import metagen.Meta.Params;
 import metagen.Meta.Props;
 
 import static lombok.AccessLevel.NONE;
-import static metagen.Meta.EnumType.*;
+import static metagen.Meta.EnumType.NAME;
+import static metagen.Meta.EnumType.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))
-public class UserBean implements IdAware<Long> {
+public class User implements IdAware<Long> {
 
     public Long id;
     public Address address;
@@ -31,10 +31,10 @@ public class UserBean implements IdAware<Long> {
     Integer age;
     @Getter(NONE)
     @Setter(NONE)
-    private Integer transientVersion;
+    private Integer version; // excluded private field
 
     @Data
-    @Meta(properties = @Props(NAME), params = @Params(Meta.EnumType.NONE))
+    @Meta(properties = @Props(NAME), params = @Params(EnumType.NONE))
     public static class Address {
         private final String postalCode;
         private final String city;
@@ -43,10 +43,20 @@ public class UserBean implements IdAware<Long> {
 }
 ```
 
-Output: Input:
+    package example.simple;
+
+    import metagen.Meta;
+
+    @Meta
+    public interface IdAware<ID> {
+
+        ID getId();
+    }
+
+Output:
 
 ``` java
-package example.model.simple;
+package example.simple;
 
 import java.lang.Class;
 import java.lang.Long;
@@ -56,8 +66,8 @@ import javax.annotation.processing.Generated;
 import metagen.Meta;
 
 @Generated("Meta")
-public final class UserBeanMeta {
-  UserBeanMeta() {
+public final class UserMeta {
+  UserMeta() {
   }
 
   public static class IdAwareParam {
@@ -82,7 +92,7 @@ public final class UserBeanMeta {
 }
 ```
 
-    package example.model.simple;
+    package example.simple;
 
     import java.lang.String;
     import java.util.List;
@@ -90,8 +100,8 @@ public final class UserBeanMeta {
     import metagen.Meta;
 
     @Generated("Meta")
-    public final class UserBeanAddressMeta {
-      UserBeanAddressMeta() {
+    public final class UserAddressMeta {
+      UserAddressMeta() {
       }
 
       public static class Prop {
