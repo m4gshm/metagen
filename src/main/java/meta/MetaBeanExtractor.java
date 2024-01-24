@@ -489,7 +489,8 @@ public class MetaBeanExtractor {
         } else {
             propAnnotations.addAll(annotations);
         }
-        property.setAnnotations(propAnnotations);}
+        property.setAnnotations(propAnnotations);
+    }
 
     record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {
         public TypeInfo(TypeElement typeElement) {

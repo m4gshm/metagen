@@ -268,9 +268,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     }
 
     private static boolean isExcluded(MetaBean.Property property) {
-        var excl = property.getAnnotation(Meta.Exclude.class);
-        var colExcl = property.getAnnotation(Exclude.class);
-        return excl != null || colExcl != null;
+        return property.isExcluded() || property.getAnnotation(JpaColumns.Exclude.class) != null;
     }
 
     private static Column newColumn(boolean pk, MetaBean.Property property,

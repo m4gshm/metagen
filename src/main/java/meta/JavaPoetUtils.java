@@ -169,22 +169,26 @@ public class JavaPoetUtils {
             var allReadable = true;
             var allWritable = true;
             for (var property : bean.getPublicProperties()) {
-                var propertyName = property.getName();
-                if (propertyPerName.put(propertyName, property) != null) {
-                    throw new IllegalStateException("property already handled, " + propertyName);
+                if (!property.isExcluded()) {
+                    var propertyName = property.getName();
+                    if (propertyPerName.put(propertyName, property) != null) {
+                        throw new IllegalStateException("property already handled, " + propertyName);
+                    }
+                    allReadable &= isReadable(property);
+                    allWritable &= isWriteable(property);
                 }
-                allReadable &= isReadable(property);
-                allWritable &= isWriteable(property);
             }
 
             var sc = superclass;
             while (sc != null) {
                 for (var property : superclass.getPublicProperties()) {
-                    var propertyName = property.getName();
-                    if (!propertyPerName.containsKey(propertyName)) {
-                        propertyPerName.put(propertyName, property);
-                        allReadable &= isReadable(property);
-                        allWritable &= isWriteable(property);
+                    if (!property.isExcluded()) {
+                        var propertyName = property.getName();
+                        if (!propertyPerName.containsKey(propertyName)) {
+                            propertyPerName.put(propertyName, property);
+                            allReadable &= isReadable(property);
+                            allWritable &= isWriteable(property);
+                        }
                     }
                 }
                 sc = sc.getSuperclass();

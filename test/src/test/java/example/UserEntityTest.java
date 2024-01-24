@@ -122,9 +122,10 @@ public class UserEntityTest {
         Column.CITY.set(dest, Column.CITY.get(src));
         Column.POSTAL_CODE.set(dest, Column.POSTAL_CODE.get(src));
         Column.LEGAL_STREET.set(dest, Column.LEGAL_STREET.get(src));
+//        Column.TAGS
 
-        var noTags = Column.values().stream().noneMatch(c -> c.name().equals("TAGS"));
-        assertTrue(noTags);
+        var noTags = Column.values().stream().anyMatch(c -> c.name().equals("TAGS"));
+        assertFalse(noTags);
         assertEquals(src, dest);
     }
 }
