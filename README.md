@@ -32,12 +32,12 @@ public class User implements IdAware<Long> {
     @Setter(NONE)
     private Integer version; // excluded private field
 
-    @Data
     @Meta(properties = @Props(NAME))
-    public static class Address {
-        private final String postalCode;
-        private final String city;
-        private final String street;
+    public record Address(String postalCode, String city, String street, @Meta.Exclude String version) {
+        @Meta.Exclude
+        public String getFullAddress() {
+            return postalCode + ", " + city + ", " + street;
+        }
     }
 }
 ```
@@ -109,7 +109,11 @@ public final class UserAddressMeta implements ParametersAware<User.Address> {
 
     public static final String street = "street";
 
-    private static final List<String> values = List.of(postalCode, city, street);
+    public static final String version = "version";
+
+    public static final String fullAddress = "fullAddress";
+
+    private static final List<String> values = List.of(postalCode, city, street, version, fullAddress);
 
     public static final List<String> values() {
       return values;

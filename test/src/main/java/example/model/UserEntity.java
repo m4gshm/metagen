@@ -47,6 +47,7 @@ public class UserEntity extends Entity<Long> implements IdAware<Long> {
             @AttributeOverride(name = "street", column = @Column(name = "LEGAL_STREET")),
     })
     private Address legalAddress;
+    @JpaColumns.Exclude
     private Tag[] tags;
 
     @Meta

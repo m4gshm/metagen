@@ -3,12 +3,11 @@ package meta;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.ElementType.PACKAGE;
-import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.ElementType.*;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static meta.Meta.EnumType.FULL;
 
-@Target({TYPE, PACKAGE})
+@Target(TYPE)
 @Retention(SOURCE)
 public @interface Meta {
     String META = "Meta";
@@ -100,6 +99,7 @@ public @interface Meta {
         String className() default CLASS_NAME;
 
         boolean detect() default true;
+
         boolean generateMeta() default false;
     }
 
@@ -115,5 +115,11 @@ public @interface Meta {
 
             String[] value();
         }
+    }
+
+    @Retention(SOURCE)
+    @Target({METHOD, FIELD, RECORD_COMPONENT})
+    @interface Exclude {
+
     }
 }

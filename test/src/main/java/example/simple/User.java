@@ -24,11 +24,10 @@ public class User implements IdAware<Long> {
     @Setter(NONE)
     private Integer version; // excluded private field
 
-    @Data
     @Meta(properties = @Props(NAME))
-    public static class Address {
-        private final String postalCode;
-        private final String city;
-        private final String street;
+    public record Address(String postalCode, String city, String street) {
+        public String getFullAddress() {
+            return postalCode + ", " + city + ", " + street;
+        }
     }
 }

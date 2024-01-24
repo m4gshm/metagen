@@ -5,7 +5,9 @@ import lombok.Data;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
+import java.lang.annotation.Annotation;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder(toBuilder = true)
@@ -65,9 +67,23 @@ public class MetaBean {
         private TypeMirror evaluatedType;
         private List<AnnotationMirror> annotations;
         private MetaBean bean;
+        private boolean excluded;
 
         public boolean isPublic() {
             return (field != null && isPublicField) || setter != null || getter != null || recordComponent != null;
+        }
+
+        public <T extends Annotation> Map<? extends ExecutableElement, ? extends AnnotationValue> getAnnotation(
+                Class<T> annotationClass
+        ) {
+            var annotationClassName = annotationClass.getCanonicalName();
+            return annotations.stream().filter(a -> {
+                        var annotationType = a.getAnnotationType();
+                        var annotationTypeName = annotationType.toString();
+                        return annotationTypeName.equals(annotationClassName);
+                    })
+                    .map(AnnotationMirror::getElementValues)
+                    .findFirst().orElse(null);
         }
     }
 

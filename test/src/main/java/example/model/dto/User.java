@@ -8,5 +8,5 @@ import java.util.Set;
 
 @Builder(toBuilder = true)
 @Meta(builder = @Meta.Builder(generateMeta = true), customizers = @Meta.Extend(JpaColumns.class))
-public record User(String name, String age, Set<String> tags) {
+public record User(String name, String age, Set<String> tags, @Meta.Exclude String version) {
 }

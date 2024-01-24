@@ -107,11 +107,11 @@ public class UserEntityTest {
                 .legalAddress(UserEntity.Address.builder()
                         .street("Centr. st")
                         .build())
-                .tags(new UserEntity.Tag[]{
-                        UserEntity.Tag.builder()
-                                .tagValue("tag")
-                                .build()
-                })
+//                .tags(new UserEntity.Tag[]{
+//                        UserEntity.Tag.builder()
+//                                .tagValue("tag")
+//                                .build()
+//                })
                 .build();
 
         var dest = UserEntity.builder().build();
@@ -119,11 +119,12 @@ public class UserEntityTest {
         Column.ID.set(dest, Column.ID.get(src));
         Column.AG_E.set(dest, Column.AG_E.get(src));
         Column.NAME.set(dest, Column.NAME.get(src));
-        Column.TAGS.set(dest, Column.TAGS.get(src));
         Column.CITY.set(dest, Column.CITY.get(src));
         Column.POSTAL_CODE.set(dest, Column.POSTAL_CODE.get(src));
         Column.LEGAL_STREET.set(dest, Column.LEGAL_STREET.get(src));
 
+        var noTags = Column.values().stream().noneMatch(c -> c.name().equals("TAGS"));
+        assertTrue(noTags);
         assertEquals(src, dest);
     }
 }

@@ -349,6 +349,9 @@ public class MetaBeanExtractor {
                 var propType = recordComponent.asType();
                 var annotationMirrors = recordComponent.getAnnotationMirrors();
                 var property = getProperty(properties, recordName.toString());
+                if (recordComponent.getAnnotation(Meta.Exclude.class) != null) {
+                    property.setExcluded(true);
+                }
                 property.setRecordComponent(recordComponent);
                 updateType(property, propType, typeParameters, annotationMirrors, meta, touched);
             }
@@ -386,6 +389,9 @@ public class MetaBeanExtractor {
                     }
 
                     var property = getProperty(properties, propName);
+                    if (enclosedElement.getAnnotation(Meta.Exclude.class) != null) {
+                        property.setExcluded(true);
+                    }
                     if (setter) {
                         property.setSetter(ee);
                     }
@@ -458,7 +464,9 @@ public class MetaBeanExtractor {
                 .typeParameters(typeParameters)
                 .beanBuilderInfo(beanBuilder)
                 .build();
+
         touched.put(type, metaBean);
+
         return metaBean;
     }
 
@@ -481,8 +489,7 @@ public class MetaBeanExtractor {
         } else {
             propAnnotations.addAll(annotations);
         }
-        property.setAnnotations(propAnnotations);
-    }
+        property.setAnnotations(propAnnotations);}
 
     record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {
         public TypeInfo(TypeElement typeElement) {

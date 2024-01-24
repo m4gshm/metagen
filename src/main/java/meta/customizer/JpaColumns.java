@@ -11,6 +11,7 @@ import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.ExecutableElement;
+import java.lang.annotation.Retention;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -19,6 +20,7 @@ import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Character.*;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static java.util.Arrays.stream;
 import static java.util.Collections.reverse;
 import static java.util.Objects.requireNonNull;
@@ -40,12 +42,10 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     public static final String[] DEFAULT_CHECK_FOR_ENTITY_ANNOTATION = new String[]{FALSE.toString()};
     public static final String[] DEFAULT_CLASS_NAME = new String[]{"JpaColumn"};
     public static final Class[] DEFAULT_IMPLEMENTS = new Class[]{meta.jpa.Column.class};
-
     private final String className;
     private final boolean withSuperclassColumns;
     private final boolean checkForEntityAnnotation;
     private final List<Class> implementInterfaces;
-
     public JpaColumns(Map<String, String[]> opts) {
         opts = opts != null ? opts : Map.of();
         this.className = opts.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME)[0];
@@ -235,7 +235,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                 ? builderSetters.stream().collect(toMap(Setter::getName, s -> s))
                 : Map.<String, Setter>of();
 
-        return bean.getProperties().stream().flatMap(property -> {
+        return bean.getProperties().stream().filter(property -> !isExcluded(property)).flatMap(property -> {
             var name = property.getName();
             var type = property.getEvaluatedType();
 
@@ -265,6 +265,12 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                         columnOverrides));
             }
         }).toList();
+    }
+
+    private static boolean isExcluded(MetaBean.Property property) {
+        var excl = property.getAnnotation(Meta.Exclude.class);
+        var colExcl = property.getAnnotation(Exclude.class);
+        return excl != null || colExcl != null;
     }
 
     private static Column newColumn(boolean pk, MetaBean.Property property,
@@ -408,7 +414,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         }
         if (allBuildable) {
             jpaColumnsClass.addField(FieldSpec.builder(typeClassOf(builderType), builderTypeFieldName)
-                            .addModifiers(PUBLIC, FINAL).build());
+                    .addModifiers(PUBLIC, FINAL).build());
 
             constructor.addParameter(typeClassOf(builderType), "builderType");
             constructor.addStatement("this." + builderTypeFieldName + " = " + "builderType");
@@ -443,6 +449,11 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
         out.addType(jpaColumnsClass.build());
         return out;
+    }
+
+    @Retention(SOURCE)
+    public @interface Exclude {
+
     }
 
     @Builder(toBuilder = true)
