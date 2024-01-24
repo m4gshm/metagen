@@ -65,15 +65,18 @@ public class JavaPoetUtils {
         var inheritParamsOf = false;
         var superclass = bean.getSuperclass();
         var interfaces = bean.getInterfaces();
+
+        var typeParameters = bean.getTypeParameters();
+
+        var addParamsType = !typeParameters.isEmpty();
+        var addInheritParamsOf = false;
+
         if (paramsEnum != NONE) {
             var params = parameters.get();
             var typeName = getUniqueName(params.className(), uniqueNames);
             var methodName = params.methodName();
 
             inheritParams = Meta.Params.METHOD_NAME.equals(methodName) && paramsEnum == FULL;
-
-            var typeParameters = bean.getTypeParameters();
-            var addParamsType = !typeParameters.isEmpty();
             if (addParamsType) {
                 builder.addType(newParamsType(typeName, typeParameters, paramsEnum));
             }
@@ -117,6 +120,7 @@ public class JavaPoetUtils {
                         superTypeName, true
                 );
             }
+
             var interfacesParams = inherited != null ? inherited.interfaces() : null;
             if (interfacesParams != null && interfaces != null && !interfaces.isEmpty() && interfacesParams.enumerate()) {
                 inheritParamsOf = Meta.Params.Inherited.Interfaces.METHOD_NAME.equals(interfacesParams.methodName()) && paramsEnum == FULL;
@@ -134,6 +138,7 @@ public class JavaPoetUtils {
                 }
                 inheritedParamsField.initializer(inheritedParamsFieldInitializer.add("\n)").build());
                 if (paramsEnum == FULL) {
+                    addInheritParamsOf = true;
                     builder.addField(inheritedParamsField.build());
                     builder.addMethod(returnListMethodBuilder(
                             interfacesParams.methodName(),
@@ -419,7 +424,7 @@ public class JavaPoetUtils {
                     ClassName.get(MetaModel.class), beanType
             ));
         } else {
-            if (inheritParams || inheritParamsOf) {
+            if ((inheritParams && addParamsType) || (inheritParamsOf && addInheritParamsOf)) {
                 builder.addSuperinterface(ParameterizedTypeName.get(ClassName.get(ParametersAware.class), beanType));
             }
             if (inheritProps) {

@@ -94,10 +94,9 @@ package example.simple;
 import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
-import meta.ParametersAware;
 
 @Generated("meta.Meta")
-public final class UserAddressMeta implements ParametersAware<User.Address> {
+public final class UserAddressMeta {
   UserAddressMeta() {
   }
 
