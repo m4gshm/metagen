@@ -46,6 +46,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     private final boolean withSuperclassColumns;
     private final boolean checkForEntityAnnotation;
     private final List<Class> implementInterfaces;
+
     public JpaColumns(Map<String, String[]> opts) {
         opts = opts != null ? opts : Map.of();
         this.className = opts.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME)[0];
@@ -245,26 +246,30 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             }
 
             var annotations = getAnnotationElements(property.getAnnotations());
-            var _transient = annotations.get("javax.persistence.Transient");
-            var embedded = annotations.get("javax.persistence.Embedded");
-            var embeddedId = annotations.get("javax.persistence.EmbeddedId");
+            var _transient = getJpaAnnotation(annotations, "javax.persistence.Transient", "jakarta.persistence.Transient");
+            var embedded = getJpaAnnotation(annotations, "javax.persistence.Embedded", "jakarta.persistence.Embedded");
+            var embeddedId = getJpaAnnotation(annotations, "javax.persistence.EmbeddedId", "jakarta.persistence.EmbeddedId");
 
             if (_transient != null) {
                 return Stream.empty();
             } else if (embedded != null || embeddedId != null) {
                 var embeddedColumns = getEmbeddedColumns(messager, property, getColumnOverrides(
-                        annotations.get("javax.persistence.AttributeOverrides"))
-                );
+                        getJpaAnnotation(annotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides")
+                ));
                 return embeddedId == null ? embeddedColumns.stream()
                         : embeddedColumns.stream().map(c -> c.toBuilder().pk(true).build());
             } else {
                 return Stream.of(newColumn(
-                        annotations.get("javax.persistence.Id") != null,
+                        getJpaAnnotation(annotations, "javax.persistence.Id", "jakarta.persistence.Id") != null,
                         property, builderInfo, possibleBuilderSetter,
-                        annotations.get("javax.persistence.Column"),
+                        getJpaAnnotation(annotations, "javax.persistence.Column", "jakarta.persistence.Column"),
                         columnOverrides));
             }
         }).toList();
+    }
+
+    private static Map<String, Object> getJpaAnnotation(Map<String, Map<String, Object>> annotations, String javax, String jakarta) {
+        return ofNullable(annotations.get(javax)).orElse(annotations.get(jakarta));
     }
 
     private static boolean isExcluded(MetaBean.Property property) {
@@ -313,7 +318,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         var beanType = bean.getType();
         var beanClass = ClassName.get(beanType);
         var beanAnnotations = getAnnotationElements(beanType.getAnnotationMirrors());
-        if (this.checkForEntityAnnotation && beanAnnotations.get("javax.persistence.Entity") != null) {
+        if (this.checkForEntityAnnotation && getJpaAnnotation(beanAnnotations, "javax.persistence.Entity", "jakarta.persistence.Entity") != null) {
             return out;
         }
         var className = ClassName.get("", this.className);
@@ -325,7 +330,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         implementInterfaces.stream().map(iface -> ParameterizedTypeName.get(ClassName.get(iface), typeVariable))
                 .forEach(jpaColumnsClass::addSuperinterface);
 
-        var columnOverrides = getColumnOverrides(beanAnnotations.get("javax.persistence.AttributeOverrides"));
+        var columnOverrides = getColumnOverrides(getJpaAnnotation(beanAnnotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides"));
 
         var columnNames = new LinkedHashSet<String>();
         var builderInfo = bean.getBeanBuilderInfo();
@@ -336,7 +341,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             var superclass = bean.getSuperclass();
             while (superclass != null) {
                 var superclassAnnotations = getAnnotationElements(superclass.getType().getAnnotationMirrors());
-                var superclassColumnOverrides = getColumnOverrides(superclassAnnotations.get("javax.persistence.AttributeOverrides"));
+                var superclassColumnOverrides = getColumnOverrides(getJpaAnnotation(superclassAnnotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides"));
                 parentColumnOverrides.putAll(superclassColumnOverrides);
                 var superclassColumns = getColumns(messager, superclass, parentColumnOverrides, builderInfo);
                 superclass = superclass.getSuperclass();
