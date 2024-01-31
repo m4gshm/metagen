@@ -3,34 +3,61 @@ package meta;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.RECORD_COMPONENT;
+import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static meta.Meta.EnumType.FULL;
 
+/**
+ * Applies the metadata generator for a marked class.
+ * The generator creates a metadata class contains information about bean properties and type parameters of the marked class.
+ */
 @Target(TYPE)
 @Retention(SOURCE)
 public @interface Meta {
     String META = "Meta";
 
+    /**
+     * The metadata class name consist of the marked class name followed by a suffix.
+     *
+     * @return suffix of the metadata.
+     */
     String suffix() default META;
 
+    /**
+     * @return options of the properties part metadata.
+     */
     Props properties() default @Props();
 
+    /**
+     * @return options of the type parameters part metadata.
+     */
     Params params() default @Params();
 
+    /**
+     * @return options of the Lombok builder part metadata.
+     */
     Builder builder() default @Builder();
 
+    /**
+     * Indicates that the generated metadata is included into a package level aggregator class.
+     * The aggregator class is named as the package name, capitalized.
+     * The generated metadata class must implement {@link meta.MetaModel}.
+     * @return true if the metadata should be aggregated.
+     */
     boolean aggregate() default true;
 
+    /**
+     * Additional metadata customizers that modify or append generated code.
+     * @return one or any customizer options {@link Extend}.
+     */
     Extend[] customizers() default {};
 
-    enum EnumType {
-        NONE,
-        NAME,
-        TYPE,
-        FULL
-    }
-
+    /**
+     * Describes the properties part of the metadata.
+     */
     @Retention(SOURCE)
     @interface Props {
         String METHOD_NAME = "properties";
@@ -43,6 +70,9 @@ public @interface Meta {
         String methodName() default METHOD_NAME;
     }
 
+    /**
+     * Describes the type parameters part of the metadata.
+     */
     @Retention(SOURCE)
     @interface Params {
         String METHOD_NAME = "parameters";
@@ -56,6 +86,9 @@ public @interface Meta {
 
         Inherited inherited() default @Inherited;
 
+        /**
+         * Options of inherited type parameters.
+         */
         @Retention(SOURCE)
         @interface Inherited {
             Super parentClass() default @Super;
@@ -89,7 +122,7 @@ public @interface Meta {
     }
 
     /**
-     * Generates Lombok @Builder, @SuperBuilder meta class.
+     * Generates metadata of the Lombok @Builder, @SuperBuilder features.
      * Experimental feature.
      */
     @Retention(SOURCE)
@@ -103,6 +136,10 @@ public @interface Meta {
         boolean generateMeta() default false;
     }
 
+    /**
+     * Options of metadata customizer.
+     * The customizer is a class implements {@link meta.MetaCustomizer} type.
+     */
     @Retention(SOURCE)
     @interface Extend {
         Class<? extends MetaCustomizer<?>> value();
@@ -117,9 +154,37 @@ public @interface Meta {
         }
     }
 
+    /**
+     * Specifies the metadata content to be generated.
+     */
+    enum EnumType {
+        /**
+         * generate nothing
+         */
+        NONE,
+        /**
+         * only names of properties or parameters
+         */
+        NAME,
+        /**
+         * only types of properties or parameters
+         */
+        TYPE,
+        /**
+         * names, types, accessors of properties
+         * names, types of type parameters
+         * inherited class and interfaces parameters
+         */
+        FULL
+    }
+
+    /**
+     * Excludes the marked property or type parameter from the generated metadata part.
+     */
     @Retention(SOURCE)
     @Target({METHOD, FIELD, RECORD_COMPONENT})
     @interface Exclude {
 
     }
+
 }

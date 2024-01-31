@@ -3,6 +3,10 @@
 Enumerated constants generator based on bean properties and type
 parameters.
 
+## Install
+
+TODO
+
 Input:
 
 ``` java

@@ -31,6 +31,9 @@ import static javax.tools.Diagnostic.Kind.OTHER;
 import static meta.JavaPoetUtils.*;
 import static meta.MetaBeanExtractor.isEquals;
 
+/**
+ * TODO
+ */
 @RequiredArgsConstructor
 public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 

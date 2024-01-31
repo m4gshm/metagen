@@ -26,7 +26,7 @@ public class UserEntityTest {
         assertTrue(metaModel.parameters().isEmpty());
 //        assertEquals(UserEntityMeta.Param.values(), metaModel.parameters());
         assertEquals(UserEntityMeta.EntityParam.values(), metaModel.parametersOf(Meta.Params.Inherited.Super.class));
-        assertEquals(UserEntityMeta.EntityParam.values(), ((SuperParametersAware) metaModel).superParameters());
+        assertEquals(UserEntityMeta.EntityParam.values(), ((SuperParametersAware<?>) metaModel).superParameters());
     }
 
     @Test

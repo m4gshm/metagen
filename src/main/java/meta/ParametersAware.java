@@ -2,6 +2,10 @@ package meta;
 
 import java.util.List;
 
+/**
+ * Provides access to type parameters.
+ * @param <T> bean type.
+ */
 public interface ParametersAware<T> {
     default List<? extends Typed<?>> parameters() {
         return List.of();
