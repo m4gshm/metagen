@@ -1,12 +1,24 @@
 = Metagen
 
 == Metagen (under construction)
-
 Enumerated constants generator based on bean properties and type parameters.
 
 === Install
+==== Gradle (Kotlin  syntax)
+Add the code below to your `build.gradle.kts`
+[source,kotlin]
+----
+repositories {
+    mavenCentral()
+}
 
-TODO
+dependencies {
+    annotationProcessor("com.github.m4gshm:metagen:0.0.1")
+    compileOnly("com.github.m4gshm:metagen:0.0.1")
+}
+----
+
+=== Minimal usage example
 
 Input:
 [source,java]

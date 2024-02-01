@@ -1,7 +1,6 @@
 plugins {
-    id("java-library")
+    id("java")
 }
-
 
 dependencies {
     compileOnly("org.projectlombok:lombok:1.18.30")
@@ -11,7 +10,7 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok:1.18.30")
 
     annotationProcessor(project(":"))
-    api(project(":"))
+    implementation(project(":"))
     implementation("org.hibernate.javax.persistence:hibernate-jpa-2.1-api:1.0.2.Final")
 
     implementation("org.springframework.data:spring-data-jpa:3.2.1")

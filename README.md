@@ -5,7 +5,22 @@ parameters.
 
 ## Install
 
-TODO
+### Gradle (Kotlin syntax)
+
+Add the code below to your `build.gradle.kts`
+
+``` kotlin
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    annotationProcessor("com.github.m4gshm:metagen:0.0.1")
+    compileOnly("com.github.m4gshm:metagen:0.0.1")
+}
+```
+
+## Minimal usage example
 
 Input:
 
