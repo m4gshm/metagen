@@ -32,7 +32,8 @@ import static meta.JavaPoetUtils.*;
 import static meta.MetaBeanExtractor.isEquals;
 
 /**
- * TODO
+ * Generates JPA based metadata like column name, primary key, embedded types.
+ * Provides limited support of @Column @Id, @Transient, @Embedded, @EmbeddedId, @AttributeOverrides annotations.
  */
 @RequiredArgsConstructor
 public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {

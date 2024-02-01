@@ -1,7 +1,7 @@
 package meta;
 
 /**
- * Typed element interface.
+ * Metadata element interface.
  * @param <T> the element type.
  */
 public interface Typed<T> {

@@ -3,8 +3,8 @@ package meta.jpa;
 import meta.Typed;
 
 /**
- * TODO
- * @param <T>
+ * JPA column metadata interface.
+ * @param <T> bean type
  */
 public interface Column<T> extends Typed<T> {
 
