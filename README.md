@@ -1,7 +1,9 @@
 # Metagen (under construction)
 
-Enumerated constants generator based on bean properties and type
+Enumerated constants generator, based on bean properties and type
 parameters.
+
+Requires Java 17 or higher.
 
 ## Install
 
@@ -15,8 +17,8 @@ repositories {
 }
 
 dependencies {
-    annotationProcessor("com.github.m4gshm:metagen:0.0.1")
-    compileOnly("com.github.m4gshm:metagen:0.0.1")
+    annotationProcessor("com.github.m4gshm:metagen:0.0.1-rc1")
+    compileOnly("com.github.m4gshm:metagen:0.0.1-rc1")
 }
 ```
 

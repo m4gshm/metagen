@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.github.m4gshm"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1-rc1"
 
 allprojects {
     repositories {
@@ -84,6 +84,11 @@ publishing {
     repositories {
         maven("file://$rootDir/../m4gshm.github.io/maven2") {
             name = "GithubMavenRepo"
+        }
+    }
+    repositories {
+        mavenCentral() {
+            name = "MavenCentral"
         }
     }
 }

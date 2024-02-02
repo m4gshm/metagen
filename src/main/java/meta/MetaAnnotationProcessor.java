@@ -24,6 +24,9 @@ import static meta.JavaPoetUtils.*;
 import static meta.MetaBeanExtractor.getAggregatorName;
 import static meta.MetaBeanExtractor.getPackageClass;
 
+/**
+ * The metadata generator
+ */
 @SupportedAnnotationTypes("meta.Meta")
 @SupportedSourceVersion(RELEASE_17)
 public class MetaAnnotationProcessor extends AbstractProcessor {
