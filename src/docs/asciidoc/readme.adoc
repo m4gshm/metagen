@@ -11,7 +11,8 @@ Add the code below to your `build.gradle.kts`
 [source,kotlin]
 ----
 repositories {
-    mavenCentral()
+    //mavenCentral()
+    maven("https://m4gshm.github.io/maven")
 }
 
 dependencies {
