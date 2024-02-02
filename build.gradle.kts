@@ -31,7 +31,7 @@ tasks.test {
 }
 
 tasks.compileJava {
-    options.isVerbose = true
+//    options.isVerbose = true
 }
 
 java {
@@ -55,8 +55,10 @@ tasks.create<Exec>("pandoc") {
     commandLine = "pandoc -f docbook -t gfm $buildDir/docs/asciidoc/readme.xml -o $rootDir/README.md".split(" ")
 }
 
-tasks.build{
-    dependsOn("pandoc")
+tasks.build {
+    if (properties["no-pandoc"] == null) {
+        dependsOn("pandoc")
+    }
 }
 
 publishing {
