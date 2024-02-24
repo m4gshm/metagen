@@ -1,10 +1,12 @@
 plugins {
     `java-library`
     `maven-publish`
+    signing
+    id("com.gradleup.nmcp").version("0.0.4")
     id("org.asciidoctor.jvm.convert") version "4.0.1"
 }
 
-group = "com.github.m4gshm"
+group = "io.github.m4gshm"
 version = "0.0.1-rc1"
 
 allprojects {
@@ -36,6 +38,7 @@ tasks.compileJava {
 
 java {
     withSourcesJar()
+    withJavadocJar()
     targetCompatibility = JavaVersion.VERSION_17
     sourceCompatibility = JavaVersion.VERSION_17
     modularity.inferModulePath.set(true)
@@ -65,6 +68,8 @@ publishing {
     publications {
         create<MavenPublication>("java") {
             pom {
+                description.set("Enumerated constants generator, based on bean properties and type parameters")
+                url.set("https://github.com/m4gshm/metagen")
                 properties.put("maven.compiler.target", "${java.targetCompatibility}")
                 properties.put("maven.compiler.source", "${java.sourceCompatibility}")
                 developers {
@@ -79,6 +84,12 @@ publishing {
                     developerConnection.set("scm:git:https://github.com/m4gshm/metagen.git")
                     url.set("https://github.com/m4gshm/metagen")
                 }
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://github.com/m4gshm/metagen?tab=MIT-1-ov-file#readme")
+                    }
+                }
             }
             from(components["java"])
         }
@@ -88,9 +99,22 @@ publishing {
             name = "GithubMavenRepo"
         }
     }
-    repositories {
-        mavenCentral() {
-            name = "MavenCentral"
-        }
+}
+
+signing {
+    val extension = extensions.getByName("publishing") as PublishingExtension
+    sign(extension.publications)
+}
+
+nmcp {
+    publishAllProjectsProbablyBreakingProjectIsolation {
+        val ossrhUsername = project.properties["ossrhUsername"] as String
+        val ossrhPassword = project.properties["ossrhPassword"] as String
+        username.set(ossrhUsername)
+        password.set(ossrhPassword)
+        // publish manually from the portal
+        publicationType = "USER_MANAGED"
+//        // or if you want to publish automatically
+//        publicationType = "AUTOMATIC"
     }
 }

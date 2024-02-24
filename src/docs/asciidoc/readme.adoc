@@ -11,13 +11,12 @@ Add the code below to your `build.gradle.kts`
 [source,kotlin]
 ----
 repositories {
-    //mavenCentral()
-    maven("https://m4gshm.github.io/maven")
+    mavenCentral()
 }
 
 dependencies {
-    annotationProcessor("com.github.m4gshm:metagen:0.0.1-rc1")
-    compileOnly("com.github.m4gshm:metagen:0.0.1-rc1")
+    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc1")
+    implementation("io.github.m4gshm:metagen:0.0.1-rc1")
 }
 ----
 
