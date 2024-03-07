@@ -2,6 +2,7 @@ package meta;
 
 import lombok.RequiredArgsConstructor;
 import meta.MetaBean.BeanBuilder;
+import meta.MetaBean.Param;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.*;
@@ -73,7 +74,7 @@ public class MetaBeanExtractor {
         while (enclosingElement != null) {
             if (enclosingElement instanceof PackageElement pe) {
                 return pe;
-            } else if (enclosingElement instanceof TypeElement te && isObjectType(te)) {
+            } else if (enclosingElement instanceof TypeElement te && isNoneType(te)) {
                 return null;
             }
             enclosingElement = enclosingElement.getEnclosingElement();
@@ -84,25 +85,29 @@ public class MetaBeanExtractor {
     static TypeInfo getTypeInfo(TypeMirror typeMirror) {
         return typeMirror instanceof DeclaredType declaredType
                 && declaredType.asElement() instanceof TypeElement typeElement
-                && !isObjectType(typeElement) ? new TypeInfo(declaredType, typeElement) : null;
+                && !isNoneType(typeElement) ? new TypeInfo(declaredType, typeElement) : null;
     }
 
-    static List<MetaBean.Param> extractGenericParams(TypeElement typeElement, DeclaredType declaredType) {
+    static List<Param> extractGenericParams(TypeElement typeElement, DeclaredType declaredType) {
         var arguments = declaredType != null ? declaredType.getTypeArguments() : null;
-        var parameters = typeElement.getTypeParameters();
+        var parameters = typeElement != null ? typeElement.getTypeParameters() : List.<TypeParameterElement>of();
 
-        var params = new ArrayList<MetaBean.Param>();
+        var params = new ArrayList<Param>();
         for (int i = 0; i < parameters.size(); i++) {
             var paramName = parameters.get(i);
             var paramType = arguments != null ? arguments.get(i) : paramName.asType();
             var evaluatedType = evalType(paramType);
-            params.add(MetaBean.Param.builder()
+            params.add(Param.builder()
                     .name(paramName)
                     .type(paramType)
                     .evaluatedType(evaluatedType)
                     .build());
         }
         return params;
+    }
+
+    static boolean isNoneType(TypeElement type) {
+        return type instanceof NoType;
     }
 
     static boolean isObjectType(TypeElement type) {
@@ -117,19 +122,19 @@ public class MetaBeanExtractor {
         return evalType(type, List.of());
     }
 
-    static TypeMirror evalType(TypeMirror type, List<MetaBean.Param> beanParameters) {
-        return type instanceof TypeVariable typeVariable ? evalType(typeVariable, beanParameters)
-                : type instanceof IntersectionType intersectionType ? evalType(intersectionType, beanParameters)
+    static TypeMirror evalType(TypeMirror type, List<Param> typeParameters) {
+        return type instanceof TypeVariable typeVariable ? evalType(typeVariable, typeParameters)
+                : type instanceof IntersectionType intersectionType ? evalType(intersectionType, typeParameters)
                 : type instanceof DeclaredType || type instanceof ArrayType || type instanceof PrimitiveType ? type : null;
     }
 
-    private static TypeMirror evalType(IntersectionType intersectionType, List<MetaBean.Param> beanParameters) {
+    private static TypeMirror evalType(IntersectionType intersectionType, List<Param> beanParameters) {
         return evalType(intersectionType.getBounds().get(0), beanParameters);
     }
 
-    private static TypeMirror evalType(TypeVariable typeVariable, List<MetaBean.Param> beanParameters) {
+    private static TypeMirror evalType(TypeVariable typeVariable, List<Param> beanParameters) {
         var collect = beanParameters != null
-                ? beanParameters.stream().collect(toMap(p -> p.getName().asType(), MetaBean.Param::getType))
+                ? beanParameters.stream().collect(toMap(p -> p.getName().asType(), Param::getType))
                 : Map.<TypeMirror, TypeMirror>of();
         var type = collect.get(typeVariable);
         if (type != null && !isEquals(type, typeVariable)) {
@@ -156,7 +161,7 @@ public class MetaBeanExtractor {
     }
 
     private static BeanBuilder newBeanBuilder(
-            Messager messager, TypeElement beanType, List<MetaBean.Param> typeParameters,
+            Messager messager, TypeElement beanType, List<Param> typeParameters,
             String metaClassName, BeanBuilder superBuilder) {
         var builderAnnotation = beanType.getAnnotationMirrors().stream().filter(a -> {
             var name = a.getAnnotationType().toString();
@@ -322,12 +327,27 @@ public class MetaBeanExtractor {
         return ofNullable(values.getOrDefault(attributeName, defaultValues.get(attributeName))).map(Object::toString).orElse("");
     }
 
-    public MetaBean getBean(TypeElement type) {
-        return getBean(type, null, type.getAnnotation(Meta.class), new HashMap<>());
+    private static boolean isConstructor(ExecutableElement ee) {
+        return "<init>".equals(getMethodName(ee));
     }
 
-    private MetaBean getBean(TypeElement type, DeclaredType declaredType, Meta meta, Map<TypeElement, MetaBean> touched) {
-        if (type == null || isObjectType(type) || isJavaLang(type)) {
+    private static List<Param> getParameters(List<Param> childParams, TypeInfo superclass) {
+        var params = extractGenericParams(superclass.typeElement, superclass.declaredType);
+        var childTypeToEvaluatedType = childParams.stream().collect(toMap(p -> p.getName().asType(), Param::getEvaluatedType));
+
+        var childPopulatedParams = params.stream().map(p -> p.toBuilder()
+                .evaluatedType(childTypeToEvaluatedType.getOrDefault(p.getType(), p.getEvaluatedType()))
+                .build()).toList();
+        return childPopulatedParams;
+    }
+
+    public MetaBean getBean(TypeElement type) {
+        return getBean(type, extractGenericParams(type, null), type.getAnnotation(Meta.class), new HashMap<>());
+    }
+
+    private MetaBean getBean(TypeElement type, List<Param> typeParameters,
+                             Meta meta, Map<TypeElement, MetaBean> touched) {
+        if (type == null || isNoneType(type) || isJavaLang(type)) {
             return null;
         }
 
@@ -338,8 +358,8 @@ public class MetaBeanExtractor {
 
         var isRecord = false;
 
-        var typeParameters = extractGenericParams(type, declaredType);
         var properties = new LinkedHashMap<String, MetaBean.Property>();
+        var methods = new LinkedHashMap<String, ExecutableElement>();
         var nestedTypes = new ArrayList<TypeElement>();
         var recordComponents = type.getRecordComponents();
         if (recordComponents != null) {
@@ -362,7 +382,8 @@ public class MetaBeanExtractor {
             var modifiers = enclosedElement.getModifiers();
             var isPublic = modifiers.contains(PUBLIC);
             var isStatic = modifiers.contains(STATIC);
-            if (!isStatic && isPublic && enclosedElement instanceof ExecutableElement ee) {
+            if (!isStatic && isPublic && enclosedElement instanceof ExecutableElement ee && !isConstructor(ee)) {
+                methods.put(getMethodName(ee), ee);
                 var getter = isGetter(ee);
                 var setter = isSetter(ee);
                 var boolGetter = isBoolGetter(ee);
@@ -413,12 +434,11 @@ public class MetaBeanExtractor {
         }
 
         var superBean = ofNullable(getTypeInfo(type.getSuperclass())).map(superclass ->
-                getBean(superclass.typeElement, superclass.declaredType, meta, touched)
+                getBean(superclass.typeElement, getParameters(typeParameters, superclass), meta, touched)
         ).orElse(null);
 
-        var interfaceBeans = type.getInterfaces().stream().map(MetaBeanExtractor::getTypeInfo)
-                .filter(Objects::nonNull).map(iface -> getBean(iface.typeElement, iface.declaredType, meta, touched))
-                .toList();
+        var interfaceBeans = type.getInterfaces().stream().map(MetaBeanExtractor::getTypeInfo).filter(Objects::nonNull
+        ).map(iface -> getBean(iface.typeElement, getParameters(typeParameters, iface), meta, touched)).toList();
 
         var name = type.getSimpleName().toString();
 
@@ -460,6 +480,7 @@ public class MetaBeanExtractor {
                 .superclass(superBean)
                 .interfaces(interfaceBeans)
                 .nestedTypes(nestedTypes)
+                .methods(new ArrayList<>(methods.values()))
                 .properties(new ArrayList<>(properties.values()))
                 .typeParameters(typeParameters)
                 .beanBuilderInfo(beanBuilder)
@@ -471,16 +492,16 @@ public class MetaBeanExtractor {
     }
 
     private void updateType(MetaBean.Property property, TypeMirror propType,
-                            List<MetaBean.Param> beanParameters,
+                            List<Param> typeParameters,
                             List<? extends AnnotationMirror> annotations, Meta meta, Map<TypeElement, MetaBean> touched) {
         var existType = property.getType();
         if (existType == null) {
             property.setType(propType);
-            var evaluatedType = evalType(propType, beanParameters);
+            var evaluatedType = evalType(propType, typeParameters);
             property.setEvaluatedType(evaluatedType);
 
             if (evaluatedType instanceof DeclaredType dt && dt.asElement() instanceof TypeElement te) {
-                property.setBean(this.getBean(te, dt, meta, touched));
+                property.setBean(this.getBean(te, typeParameters, meta, touched));
             }
         }
         var propAnnotations = property.getAnnotations();

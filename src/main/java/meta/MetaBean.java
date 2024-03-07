@@ -9,12 +9,15 @@ import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
 
+import static javax.lang.model.element.Modifier.PUBLIC;
+
 @Data
 @Builder(toBuilder = true)
 public class MetaBean {
     private TypeElement type;
     private String name;
     private String packageName;
+    private List<ExecutableElement> methods;
     private List<Property> properties;
     private List<Param> typeParameters;
     private MetaBean superclass;
@@ -26,6 +29,10 @@ public class MetaBean {
 
     public List<MetaBean.Property> getPublicProperties() {
         return this.getProperties().stream().filter(MetaBean.Property::isPublic).toList();
+    }
+
+    public List<ExecutableElement> getPublicMethods() {
+        return this.getMethods().stream().filter(ee -> ee.getModifiers().contains(PUBLIC)).toList();
     }
 
     public String getClassName() {
@@ -88,7 +95,7 @@ public class MetaBean {
     }
 
     @Data
-    @Builder
+    @Builder(toBuilder = true)
     public static final class Param {
         private TypeParameterElement name;
         private TypeMirror type;

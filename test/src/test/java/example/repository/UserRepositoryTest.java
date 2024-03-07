@@ -1,6 +1,7 @@
 package example.repository;
 
 import example.model.UserEntity;
+import example.repository.UserRepositoryMeta.Method;
 import meta.Typed;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.CrudRepository;
@@ -17,5 +18,12 @@ public class UserRepositoryTest {
         var params = values.stream().collect(toMap(t -> t, Typed::type));
         assertEquals(UserEntity.class, params.get(UserRepositoryMeta.CrudRepositoryParam.T));
         assertEquals(Long.class, params.get(UserRepositoryMeta.CrudRepositoryParam.ID));
+    }
+
+    @Test
+    public void methods() {
+        var values = Method.values();
+        assertEquals(11, values.size());
+        assertEquals(String.class, Method.findAll.getClass());
     }
 }

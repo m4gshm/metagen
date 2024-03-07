@@ -13,10 +13,10 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok:1.18.30")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.30")
 
-    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc1")
-    implementation("io.github.m4gshm:metagen:0.0.1-rc1")
-//    annotationProcessor(project(":"))
-//    implementation(project(":"))
+//    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc1")
+//    implementation("io.github.m4gshm:metagen:0.0.1-rc1")
+    annotationProcessor(project(":"))
+    implementation(project(":"))
 
     implementation("org.hibernate.javax.persistence:hibernate-jpa-2.1-api:1.0.2.Final")
 

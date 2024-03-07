@@ -3,6 +3,7 @@ package meta;
 import io.jbock.javapoet.*;
 import meta.Meta.EnumType;
 import meta.MetaBean.Param;
+import meta.MetaBean.Property;
 
 import javax.annotation.processing.Generated;
 import javax.annotation.processing.Messager;
@@ -11,6 +12,7 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -25,6 +27,7 @@ import static java.util.Optional.ofNullable;
 import static java.util.stream.IntStream.range;
 import static javax.lang.model.element.Modifier.*;
 import static meta.Meta.EnumType.*;
+import static meta.MetaBeanExtractor.getMethodName;
 
 public class JavaPoetUtils {
     public static TypeSpec.Builder newMetaTypeBuilder(
@@ -33,9 +36,11 @@ public class JavaPoetUtils {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
         var parameters = meta.map(Meta::params);
+        var metaMethods = meta.map(Meta::methods);
 
         var propsEnum = props.map(Meta.Props::value).orElse(FULL);
         var paramsEnum = parameters.map(Meta.Params::value).orElse(FULL);
+        var methodsEnum = metaMethods.map(Meta.Methods::value).orElse(Meta.Methods.EnumType.NONE);
 
         var beanType = ClassName.get(bean.getType());
 
@@ -48,9 +53,8 @@ public class JavaPoetUtils {
                         .addStatement("return type")
                         .build());
 
-        var typeField = FieldSpec.builder(
-                        typeFieldType, "type", PUBLIC, FINAL)
-                .initializer(CodeBlock.builder().addStatement(dotClass(beanType)).build())
+        var typeField = FieldSpec.builder(typeFieldType, "type", PUBLIC, FINAL)
+                .initializer(dotClass(beanType))
                 .build();
 
         var builder = classBuilder(name)
@@ -160,43 +164,43 @@ public class JavaPoetUtils {
 
         var inheritProps = false;
         if (propsEnum != NONE) {
-            var fieldLevelUniqueNames = new HashSet<String>();
+            var propsLevelUniqueNames = new HashSet<String>();
             var propsInfo = props.get();
             inheritProps = Meta.Props.METHOD_NAME.equals(propsInfo.methodName()) && propsEnum == FULL;
             var typeName = ClassName.get("", getUniqueName(propsInfo.className(), uniqueNames));
             var typeVariable = TypeVariableName.get("T");
-            var fieldsClassBuilder = propsEnum == FULL
+            var propsClassBuilder = propsEnum == FULL
                     ? typeAwareClass(typeName, typeVariable)
                     : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
 
-            var propertyPerName = new LinkedHashMap<String, MetaBean.Property>();
+            var propertyPerName = new LinkedHashMap<String, Property>();
+            var propertyWeights = new LinkedHashMap<String, AtomicInteger>();
 
-            var allReadable = true;
-            var allWritable = true;
             for (var property : bean.getPublicProperties()) {
                 if (!property.isExcluded()) {
                     var propertyName = property.getName();
                     if (propertyPerName.put(propertyName, property) != null) {
                         throw new IllegalStateException("property already handled, " + propertyName);
                     }
-                    allReadable &= isReadable(property);
-                    allWritable &= isWriteable(property);
+                    propertyWeights.put(propertyName, new AtomicInteger(1));
                 }
             }
 
             var sc = superclass;
+            var superClassPropsWeight = 2;
             while (sc != null) {
-                for (var property : superclass.getPublicProperties()) {
-                    if (!property.isExcluded()) {
-                        var propertyName = property.getName();
-                        if (!propertyPerName.containsKey(propertyName)) {
-                            propertyPerName.put(propertyName, property);
-                            allReadable &= isReadable(property);
-                            allWritable &= isWriteable(property);
-                        }
-                    }
-                }
+                addProperties(sc, propertyPerName, propertyWeights, superClassPropsWeight);
                 sc = sc.getSuperclass();
+                superClassPropsWeight++;
+            }
+
+            addInterfaceProps(interfaces, propertyPerName, propertyWeights, 1);
+
+            var allReadable = true;
+            var allWritable = true;
+            for (var property : propertyPerName.values()) {
+                allReadable &= isReadable(property);
+                allWritable &= isWriteable(property);
             }
 
             var getterName = "getter";
@@ -206,16 +210,20 @@ public class JavaPoetUtils {
             var nameArgType = ClassName.get(String.class);
             var typeArgType = typeClassOf(typeVariable);
 
-            var readTypeName = !allReadable ? ClassName.get("", getUniqueName("Read", fieldLevelUniqueNames)) : typeName;
-            var writeTypeName = !allWritable ? ClassName.get("", getUniqueName("Write", fieldLevelUniqueNames)) : typeName;
+            var readTypeName = !allReadable ? ClassName.get("", getUniqueName("Read", propsLevelUniqueNames)) : typeName;
+            var writeTypeName = !allWritable ? ClassName.get("", getUniqueName("Write", propsLevelUniqueNames)) : typeName;
             var readWriteTypeName = !allReadable || !allWritable
-                    ? ClassName.get("", getUniqueName("ReadWrite", fieldLevelUniqueNames))
+                    ? ClassName.get("", getUniqueName("ReadWrite", propsLevelUniqueNames))
                     : typeName;
 
             var rwUsed = false;
             var readUsed = false;
             var writeUsed = false;
-            for (var property : propertyPerName.values()) {
+
+            var orderedProperties = weightOrdered(propertyWeights);
+
+            for (var propertyName : orderedProperties) {
+                var property = requireNonNull(propertyPerName.get(propertyName), propertyName + " is null");
                 var read = isReadable(property);
                 var writable = isWriteable(property);
                 var full = read && writable;
@@ -234,7 +242,7 @@ public class JavaPoetUtils {
 //                    var propertyName = property.getName();
 //                    var chars = propertyName.toCharArray();
 //                    chars[0] = Character.toUpperCase(chars[0]);
-//                    var propTypeName = getUniqueName(new String(chars), fieldLevelUniqueNames);
+//                    var propTypeName = getUniqueName(new String(chars), propsLevelUniqueNames);
 //                    var propType = ClassName.get("", propTypeName);
 //
 //                    var constructor = full ? rwInheritConstructor(nameArgType, typeArgType, getterType, getterName, setterType, setterName, CodeBlock.builder()
@@ -269,7 +277,7 @@ public class JavaPoetUtils {
 ////                            }
 ////                        }
 ////                    }
-//                    fieldsClassBuilder.addType(subType.build());
+//                    propsClassBuilder.addType(subType.build());
 //                    typ = propType;
 //                }
 
@@ -285,7 +293,7 @@ public class JavaPoetUtils {
                     default -> null;
                 };
                 if (fieldSpec != null) {
-                    fieldsClassBuilder.addField(fieldSpec.build());
+                    propsClassBuilder.addField(fieldSpec.build());
                 }
             }
 
@@ -295,11 +303,17 @@ public class JavaPoetUtils {
                 var readInterface = ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
 
                 if (rwUsed && !readWriteTypeName.equals(typeName)) {
+                    var extendsReadType = readTypeName.equals(typeName);
+                    var initialize = extendsReadType
+                            ? CodeBlock.builder()
+                            .addStatement("super($L, $L, $L)", "name", "type", getterName)
+                            .addStatement("this." + setterName + " = " + setterName)
+                            : CodeBlock.builder()
+                            .addStatement("super($L, $L)", "name", "type")
+                            .addStatement("this." + getterName + " = " + getterName)
+                            .addStatement("this." + setterName + " = " + setterName);
                     var constructor = rwInheritConstructor(nameArgType, typeArgType,
-                            getterType, getterName, setterType, setterName, CodeBlock.builder()
-                                    .addStatement("super($L, $L)", "name", "type")
-                                    .addStatement("this." + getterName + " = " + getterName)
-                                    .addStatement("this." + setterName + " = " + setterName));
+                            getterType, getterName, setterType, setterName, initialize);
 
                     var subType = classBuilder(readWriteTypeName)
                             .addModifiers(STATIC, PUBLIC)
@@ -308,10 +322,12 @@ public class JavaPoetUtils {
                             .addSuperinterface(readWriteInterface)
                             .addMethod(constructor.build());
 
-                    addGetter(subType, beanType, typeVariable, getterType, getterName);
+                    if (!extendsReadType) {
+                        addGetter(subType, beanType, typeVariable, getterType, getterName);
+                    }
                     addSetter(subType, beanType, typeVariable, setterType, setterName, "set", "bean", true);
 
-                    fieldsClassBuilder.addType(subType.build());
+                    propsClassBuilder.addType(subType.build());
                 }
 
                 if (readUsed && !readTypeName.equals(typeName)) {
@@ -328,7 +344,7 @@ public class JavaPoetUtils {
 
                     addGetter(subType, beanType, typeVariable, getterType, getterName);
 
-                    fieldsClassBuilder.addType(subType.build());
+                    propsClassBuilder.addType(subType.build());
                 }
 
                 if (writeUsed && !writeTypeName.equals(typeName)) {
@@ -345,7 +361,7 @@ public class JavaPoetUtils {
 
                     addSetter(subType, beanType, typeVariable, setterType, setterName, "set", "bean", true);
 
-                    fieldsClassBuilder.addType(subType.build());
+                    propsClassBuilder.addType(subType.build());
                 }
 
                 uniqueNames.addAll(propertyPerName.keySet());
@@ -353,7 +369,7 @@ public class JavaPoetUtils {
                 var nameFieldName = getUniqueName("name", uniqueNames);
                 var typeFieldName = getUniqueName("type", uniqueNames);
 
-                populateTypeAwareClass(fieldsClassBuilder, nameFieldName, typeFieldName, nameArgType, typeArgType);
+                populateTypeAwareClass(propsClassBuilder, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
                 var constructor = constructorBuilder();
                 var constructorBody = CodeBlock.builder();
@@ -364,7 +380,7 @@ public class JavaPoetUtils {
                     var getterFieldName = getUniqueName("getter", uniqueNames);
                     var getterFunction = getFunctionType(beanType, typeVariable);
 
-                    addGetter(fieldsClassBuilder, beanType, typeVariable, getterFunction, getterFieldName);
+                    addGetter(propsClassBuilder, beanType, typeVariable, getterFunction, getterFieldName);
 
                     constructor.addParameter(getterFunction, "getter");
                     constructorBody.addStatement("this." + getterFieldName + " = " + "getter");
@@ -374,28 +390,28 @@ public class JavaPoetUtils {
                     var setterFieldName = getUniqueName("setter", uniqueNames);
                     var setterConsumer = getBiConsumerType(beanType, typeVariable);
 
-                    addSetter(fieldsClassBuilder, beanType, typeVariable, setterConsumer, setterFieldName, "set", "bean", true);
+                    addSetter(propsClassBuilder, beanType, typeVariable, setterConsumer, setterFieldName, "set", "bean", true);
 
                     constructor.addParameter(setterConsumer, "setter");
                     constructorBody.addStatement("this." + setterFieldName + " = " + "setter");
                 }
 
                 if (allReadable && allWritable) {
-                    fieldsClassBuilder.addSuperinterface(readWriteInterface);
+                    propsClassBuilder.addSuperinterface(readWriteInterface);
                 } else if (allReadable) {
-                    fieldsClassBuilder.addSuperinterface(readInterface);
+                    propsClassBuilder.addSuperinterface(readInterface);
                 } else if (allWritable) {
-                    fieldsClassBuilder.addSuperinterface(writeInterface);
+                    propsClassBuilder.addSuperinterface(writeInterface);
                 }
 
-                fieldsClassBuilder.addMethod(constructor.addCode(constructorBody.build()).build());
-                fieldsClassBuilder = addValues(fieldsClassBuilder, typeName, propertyPerName.keySet(), 1, uniqueNames);
+                propsClassBuilder.addMethod(constructor.addCode(constructorBody.build()).build());
+                propsClassBuilder = addValues(propsClassBuilder, typeName, propertyPerName.keySet(), 1, uniqueNames);
             } else {
                 if (!propertyPerName.isEmpty()) {
-                    fieldsClassBuilder = addValues(fieldsClassBuilder, ClassName.get(String.class), propertyPerName.keySet(), uniqueNames);
+                    propsClassBuilder = addValues(propsClassBuilder, ClassName.get(String.class), propertyPerName.keySet(), uniqueNames);
                 }
             }
-            builder.addType(fieldsClassBuilder.build());
+            builder.addType(propsClassBuilder.build());
             if (propsEnum == FULL) {
                 builder.addMethod(callValuesMethod(
                         propsInfo.methodName(),
@@ -403,6 +419,53 @@ public class JavaPoetUtils {
                         wildcardParametrized(typeName, 1),
                         inheritProps));
             }
+        }
+
+//        var inheritMethods = false;
+        if (methodsEnum != Meta.Methods.EnumType.NONE) {
+            var methodsLevelUniqueNames = new HashSet<String>();
+            var methodsInfo = metaMethods.get();
+//            inheritMethods = Meta.Methods.METHOD_NAME.equals(methodsInfo.methodName()) && propsEnum == FULL;
+
+            var typeName = ClassName.get("", getUniqueName(methodsInfo.className(), uniqueNames));
+            var methodsClassBuilder = classBuilder(typeName).addModifiers(PUBLIC, STATIC);
+
+            var methods = new LinkedHashSet<String>();
+            var methodWeights = new LinkedHashMap<String, AtomicInteger>();
+
+            for (var method : bean.getPublicMethods()) {
+                var methodName = getMethodName(method);
+                var added = methods.add(methodName);
+                if (!added) {
+                    throw new IllegalStateException("method already handled, " + method);
+                }
+            }
+
+            var sc = superclass;
+            var superClassMethodWeight = 2;
+            while (sc != null) {
+                addMethods(sc, methods, methodWeights, superClassMethodWeight);
+                sc = sc.getSuperclass();
+                superClassMethodWeight++;
+            }
+
+            addInterfaceMethods(interfaces, methods, methodWeights, 1);
+
+            var orderedMethods = weightOrdered(methodWeights);
+            methodsLevelUniqueNames.addAll(orderedMethods);
+
+            for (var methodName : orderedMethods) {
+                var fieldSpec = switch (methodsEnum) {
+                    case NAME -> staticField(methodName, ClassName.get(String.class)).initializer("\"$L\"", methodName);
+                    default -> null;
+                };
+                if (fieldSpec != null) {
+                    methodsClassBuilder.addField(fieldSpec.build());
+                }
+            }
+
+            addValues(methodsClassBuilder, ClassName.get(String.class), orderedMethods, methodsLevelUniqueNames);
+            builder.addType(methodsClassBuilder.build());
         }
 
         var inheritMetamodel = inheritParams && inheritParamsOf && inheritProps;
@@ -417,6 +480,8 @@ public class JavaPoetUtils {
 
             builder.addField(typeField);
             builder.addMethod(typeGetter.build());
+        } else {
+            builder.addField(typeField);
         }
 
         if (inheritMetamodel) {
@@ -456,6 +521,66 @@ public class JavaPoetUtils {
         }
 
         return builder;
+    }
+
+    private static void addProperties(MetaBean bean, Map<String, Property> propertyPerName,
+                                      Map<String, AtomicInteger> usedWeights, int weight) {
+        var properties = bean.getPublicProperties();
+        for (var property : properties) {
+            addInheritedProp(property, propertyPerName, usedWeights, weight);
+        }
+        addInterfaceProps(bean.getInterfaces(), propertyPerName, usedWeights, weight);
+    }
+
+    private static void addInterfaceMethods(List<MetaBean> interfaces, Set<String> methods,
+                                            Map<String, AtomicInteger> methodWeights, int weight) {
+        if (interfaces == null) {
+            return;
+        }
+        for (var iface : interfaces) {
+            addMethods(iface, methods, methodWeights, weight);
+        }
+    }
+
+    private static void addMethods(MetaBean bean, Set<String> methods,
+                                   Map<String, AtomicInteger> methodWeights, int weight) {
+        for (var method : bean.getPublicMethods()) {
+            var methodName = getMethodName(method);
+            methodWeights.computeIfAbsent(methodName, k -> new AtomicInteger(weight)).incrementAndGet();
+            methods.add(methodName);
+        }
+        addInterfaceMethods(bean.getInterfaces(), methods, methodWeights, weight);
+    }
+
+    private static List<String> weightOrdered(Map<String, AtomicInteger> weightValues) {
+        var ordered = new ArrayList<>(weightValues.keySet());
+        ordered.sort(new WeightComparator(weightValues));
+        return ordered;
+    }
+
+    private static void addInterfaceProps(List<MetaBean> interfaces, Map<String, Property> propertyPerName,
+                                          Map<String, AtomicInteger> usedWeights, int weight) {
+        if (interfaces == null) {
+            return;
+        }
+        for (var iface : interfaces) {
+            List<Property> properties = iface.getPublicProperties();
+            for (var property : properties) {
+                addInheritedProp(property, propertyPerName, usedWeights, weight);
+            }
+            addInterfaceProps(iface.getInterfaces(), propertyPerName, usedWeights, weight);
+        }
+    }
+
+    private static void addInheritedProp(Property property, Map<String, Property> propertyPerName,
+                                         Map<String, AtomicInteger> usedWeights, int weight) {
+        if (!property.isExcluded()) {
+            var propertyName = property.getName();
+            if (!propertyPerName.containsKey(propertyName)) {
+                propertyPerName.put(propertyName, property);
+            }
+            usedWeights.computeIfAbsent(propertyName, k -> new AtomicInteger(weight)).incrementAndGet();
+        }
     }
 
     private static MethodSpec.Builder baseConstructor(ClassName nameArgType, ParameterizedTypeName typeArgType) {
@@ -803,18 +928,18 @@ public class JavaPoetUtils {
         return name;
     }
 
-    public static boolean isReadable(MetaBean.Property property) {
+    public static boolean isReadable(Property property) {
         var getter = property.getGetter();
         var recordComponent = property.getRecordComponent();
         return getter != null || recordComponent != null || isPublicField(property);
     }
 
-    public static boolean isWriteable(MetaBean.Property property) {
+    public static boolean isWriteable(Property property) {
         var setter = property.getSetter();
         return (setter != null || isPublicField(property)) && property.getRecordComponent() == null;
     }
 
-    private static boolean isPublicField(MetaBean.Property property) {
+    private static boolean isPublicField(Property property) {
         return property.getField() != null && property.isPublicField();
     }
 
@@ -952,5 +1077,22 @@ public class JavaPoetUtils {
 
     static AnnotationSpec generatedAnnotation() {
         return AnnotationSpec.builder(Generated.class).addMember("value", "\"$L\"", ClassName.get(Meta.class).canonicalName()).build();
+    }
+
+    private static class WeightComparator implements Comparator<String> {
+        private final AtomicInteger defaultValue;
+        private final Map<String, AtomicInteger> weights;
+
+        public WeightComparator(Map<String, AtomicInteger> weights) {
+            this.weights = weights;
+            defaultValue = new AtomicInteger(1);
+        }
+
+        @Override
+        public int compare(String prop1, String prop2) {
+            var w1 = weights.getOrDefault(prop1, defaultValue);
+            var w2 = weights.getOrDefault(prop2, defaultValue);
+            return -Integer.compare(w1.get(), w2.get());
+        }
     }
 }

@@ -84,6 +84,8 @@ import javax.annotation.processing.Generated;
 
 @Generated("meta.Meta")
 public final class UserMeta {
+  public final Class<User> type = User.class;
+
   UserMeta() {
   }
 
@@ -112,12 +114,15 @@ public final class UserMeta {
 ``` java
 package example.simple;
 
+import java.lang.Class;
 import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
 
 @Generated("meta.Meta")
 public final class UserAddressMeta {
+  public final Class<User.Address> type = User.Address.class;
+
   UserAddressMeta() {
   }
 

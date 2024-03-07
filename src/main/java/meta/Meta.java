@@ -3,10 +3,7 @@ package meta;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.RECORD_COMPONENT;
-import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.ElementType.*;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static meta.Meta.EnumType.FULL;
 
@@ -37,6 +34,11 @@ public @interface Meta {
     Params params() default @Params();
 
     /**
+     * @return options of the class methods part metadata.
+     */
+    Methods methods() default @Methods();
+
+    /**
      * @return options of the Lombok builder part metadata.
      */
     Builder builder() default @Builder();
@@ -45,15 +47,41 @@ public @interface Meta {
      * Indicates that the generated metadata is included into a package level aggregator class.
      * The aggregator class is named as the package name, capitalized.
      * The generated metadata class must implement {@link meta.MetaModel}.
+     *
      * @return true if the metadata should be aggregated.
      */
     boolean aggregate() default true;
 
     /**
      * Additional metadata customizers that modify or append generated code.
+     *
      * @return one or any customizer options {@link Extend}.
      */
     Extend[] customizers() default {};
+
+    /**
+     * Specifies the metadata content to be generated.
+     */
+    enum EnumType {
+        /**
+         * generate nothing
+         */
+        NONE,
+        /**
+         * only names of properties or parameters
+         */
+        NAME,
+        /**
+         * only types of properties or parameters
+         */
+        TYPE,
+        /**
+         * names, types, accessors of properties
+         * names, types of type parameters
+         * inherited class and interfaces parameters
+         */
+        FULL
+    }
 
     /**
      * Describes the properties part of the metadata.
@@ -122,6 +150,32 @@ public @interface Meta {
     }
 
     /**
+     * Describes the class methods part of the metadata.
+     */
+    @Retention(SOURCE)
+    @interface Methods {
+        String CLASS_NAME = "Method";
+
+        EnumType value() default EnumType.NONE;
+
+        String className() default CLASS_NAME;
+
+        /**
+         * Specifies the metadata content to be generated.
+         */
+        enum EnumType {
+            /**
+             * generate nothing
+             */
+            NONE,
+            /**
+             * only names of methods
+             */
+            NAME,
+        }
+    }
+
+    /**
      * Generates metadata of the Lombok @Builder, @SuperBuilder features.
      * Experimental feature.
      */
@@ -152,30 +206,6 @@ public @interface Meta {
 
             String[] value();
         }
-    }
-
-    /**
-     * Specifies the metadata content to be generated.
-     */
-    enum EnumType {
-        /**
-         * generate nothing
-         */
-        NONE,
-        /**
-         * only names of properties or parameters
-         */
-        NAME,
-        /**
-         * only types of properties or parameters
-         */
-        TYPE,
-        /**
-         * names, types, accessors of properties
-         * names, types of type parameters
-         * inherited class and interfaces parameters
-         */
-        FULL
     }
 
     /**
