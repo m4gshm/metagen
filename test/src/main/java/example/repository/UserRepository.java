@@ -5,7 +5,7 @@ import meta.Meta;
 import meta.Meta.Methods;
 import org.springframework.data.repository.CrudRepository;
 
-import static meta.Meta.Methods.EnumType.NAME;
+import static meta.Meta.Methods.Content.NAME;
 
 
 @Meta(methods = @Methods(NAME))

@@ -5,7 +5,7 @@ import java.lang.annotation.Target;
 
 import static java.lang.annotation.ElementType.*;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
-import static meta.Meta.EnumType.FULL;
+import static meta.Meta.Content.FULL;
 
 /**
  * Applies the metadata generator for a marked class.
@@ -62,7 +62,7 @@ public @interface Meta {
     /**
      * Specifies the metadata content to be generated.
      */
-    enum EnumType {
+    enum Content {
         /**
          * generate nothing
          */
@@ -91,7 +91,7 @@ public @interface Meta {
         String METHOD_NAME = "properties";
         String CLASS_NAME = "Prop";
 
-        EnumType value() default FULL;
+        Content value() default FULL;
 
         String className() default CLASS_NAME;
 
@@ -106,7 +106,7 @@ public @interface Meta {
         String METHOD_NAME = "parameters";
         String CLASS_NAME = "Param";
 
-        EnumType value() default FULL;
+        Content value() default FULL;
 
         String className() default CLASS_NAME;
 
@@ -156,14 +156,14 @@ public @interface Meta {
     @interface Methods {
         String CLASS_NAME = "Method";
 
-        EnumType value() default EnumType.NONE;
+        Content value() default Content.NONE;
 
         String className() default CLASS_NAME;
 
         /**
          * Specifies the metadata content to be generated.
          */
-        enum EnumType {
+        enum Content {
             /**
              * generate nothing
              */

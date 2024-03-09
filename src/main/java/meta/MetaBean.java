@@ -11,6 +11,9 @@ import java.util.Map;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
 
+/**
+ * Bean metadata model.
+ */
 @Data
 @Builder(toBuilder = true)
 public class MetaBean {

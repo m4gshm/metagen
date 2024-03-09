@@ -1,7 +1,6 @@
 package meta;
 
 import io.jbock.javapoet.*;
-import meta.Meta.EnumType;
 import meta.MetaBean.Param;
 import meta.MetaBean.Property;
 
@@ -26,7 +25,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.IntStream.range;
 import static javax.lang.model.element.Modifier.*;
-import static meta.Meta.EnumType.*;
+import static meta.Meta.Content.*;
 import static meta.MetaBeanExtractor.getMethodName;
 
 public class JavaPoetUtils {
@@ -40,7 +39,7 @@ public class JavaPoetUtils {
 
         var propsEnum = props.map(Meta.Props::value).orElse(FULL);
         var paramsEnum = parameters.map(Meta.Params::value).orElse(FULL);
-        var methodsEnum = metaMethods.map(Meta.Methods::value).orElse(Meta.Methods.EnumType.NONE);
+        var methodsEnum = metaMethods.map(Meta.Methods::value).orElse(Meta.Methods.Content.NONE);
 
         var beanType = ClassName.get(bean.getType());
 
@@ -422,7 +421,7 @@ public class JavaPoetUtils {
         }
 
 //        var inheritMethods = false;
-        if (methodsEnum != Meta.Methods.EnumType.NONE) {
+        if (methodsEnum != Meta.Methods.Content.NONE) {
             var methodsLevelUniqueNames = new HashSet<String>();
             var methodsInfo = metaMethods.get();
 //            inheritMethods = Meta.Methods.METHOD_NAME.equals(methodsInfo.methodName()) && propsEnum == FULL;
@@ -434,9 +433,7 @@ public class JavaPoetUtils {
             var methodWeights = new LinkedHashMap<String, AtomicInteger>();
 
             for (var method : bean.getPublicMethods()) {
-                var methodName = getMethodName(method);
-                var added = methods.add(methodName);
-                if (!added) {
+                if (!addMethod(method, 1, methods, methodWeights)) {
                     throw new IllegalStateException("method already handled, " + method);
                 }
             }
@@ -545,11 +542,16 @@ public class JavaPoetUtils {
     private static void addMethods(MetaBean bean, Set<String> methods,
                                    Map<String, AtomicInteger> methodWeights, int weight) {
         for (var method : bean.getPublicMethods()) {
-            var methodName = getMethodName(method);
-            methodWeights.computeIfAbsent(methodName, k -> new AtomicInteger(weight)).incrementAndGet();
-            methods.add(methodName);
+            addMethod(method, weight, methods, methodWeights);
         }
         addInterfaceMethods(bean.getInterfaces(), methods, methodWeights, weight);
+    }
+
+    private static boolean addMethod(ExecutableElement method, int weight,
+                                     Set<String> methods, Map<String, AtomicInteger> methodWeights) {
+        var methodName = getMethodName(method);
+        methodWeights.computeIfAbsent(methodName, k -> new AtomicInteger(weight)).incrementAndGet();
+        return methods.add(methodName);
     }
 
     private static List<String> weightOrdered(Map<String, AtomicInteger> weightValues) {
@@ -645,10 +647,10 @@ public class JavaPoetUtils {
         return CodeBlock.of("$T.class", type);
     }
 
-    private static TypeSpec newParamsType(String typeName, List<Param> beanTypeParameters, EnumType enumType) {
+    private static TypeSpec newParamsType(String typeName, List<Param> beanTypeParameters, Meta.Content content) {
         var className = ClassName.get("", typeName);
         var typeVariable = TypeVariableName.get("T");
-        var typesBuilder = enumType == FULL ? typeAwareClass(className, typeVariable) : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
+        var typesBuilder = content == FULL ? typeAwareClass(className, typeVariable) : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
         var paramNames = new LinkedHashSet<String>();
         for (var param : beanTypeParameters) {
             var name = param.getName().getSimpleName().toString();
@@ -656,7 +658,7 @@ public class JavaPoetUtils {
             var type = TypeName.get(param.getEvaluatedType());
             var unboxedTypeVarName = unboxedTypeVarName(type);
 
-            var fieldSpec = switch (enumType) {
+            var fieldSpec = switch (content) {
                 case FULL -> staticField(name, ParameterizedTypeName.get(className, unboxedTypeVarName)).initializer(
                         newInstanceCall(className, unboxedTypeVarName, enumConstructorArgs(name, dotClass(type)))
                 );
@@ -671,7 +673,7 @@ public class JavaPoetUtils {
         }
 
         var uniqueNames = new HashSet<>(paramNames);
-        if (enumType == FULL) {
+        if (content == FULL) {
             var nameFieldName = getUniqueName("name", uniqueNames);
             var typeFieldName = getUniqueName("type", uniqueNames);
             var nameArgType = ClassName.get(String.class);
@@ -685,7 +687,7 @@ public class JavaPoetUtils {
             typesBuilder.addMethod(constructor.addCode(constructorBody.build()).build());
 
             addValues(typesBuilder, className, paramNames, 1, uniqueNames);
-        } else if (enumType == NAME) {
+        } else if (content == NAME) {
             if (!paramNames.isEmpty()) {
                 addValues(typesBuilder, ClassName.get(String.class), paramNames, uniqueNames);
             }

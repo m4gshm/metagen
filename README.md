@@ -38,8 +38,8 @@ import meta.Meta.Params;
 import meta.Meta.Props;
 
 import static lombok.AccessLevel.NONE;
-import static meta.Meta.EnumType.NAME;
-import static meta.Meta.EnumType.TYPE;
+import static meta.Meta.Content.NAME;
+import static meta.Meta.Content.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))

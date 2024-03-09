@@ -373,6 +373,8 @@ public class MetaBeanExtractor {
                     property.setExcluded(true);
                 }
                 property.setRecordComponent(recordComponent);
+                var accessor = recordComponent.getAccessor();
+                methods.put(getMethodName(accessor), accessor);
                 updateType(property, propType, typeParameters, annotationMirrors, meta, touched);
             }
         }
