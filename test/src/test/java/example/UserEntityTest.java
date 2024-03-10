@@ -10,6 +10,7 @@ import meta.Meta;
 import meta.SuperParametersAware;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static example.model.UserEntityMeta.Prop.*;
@@ -122,11 +123,16 @@ public class UserEntityTest {
         Column.CITY.set(dest, Column.CITY.get(src));
         Column.POSTAL_CODE.set(dest, Column.POSTAL_CODE.get(src));
         Column.LEGAL_STREET.set(dest, Column.LEGAL_STREET.get(src));
-//        Column.TAGS
 
         var noTags = Column.values().stream().anyMatch(c -> c.name().equals("TAGS"));
         assertFalse(noTags);
         assertEquals(src, dest);
+    }
+
+    @Test
+    public void userEntityMethods() {
+        var values = UserEntityMeta.Method.values();
+        assertEquals(13, values.size());
     }
 }
 

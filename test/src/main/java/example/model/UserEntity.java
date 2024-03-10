@@ -5,6 +5,7 @@ import example.IdAware;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import meta.Meta;
+import meta.Meta.Methods.Content;
 import meta.customizer.JpaColumns;
 
 import javax.persistence.AttributeOverride;
@@ -27,7 +28,8 @@ import static meta.customizer.JpaColumns.OPT_IMPLEMENTS;
                 opts = {
                         @Meta.Extend.Opt(key = OPT_CLASS_NAME, value = "Column"),
                         @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "meta.jpa.Column"),
-                })
+                }),
+        methods = @Meta.Methods(Content.NAME)
 )
 @javax.persistence.Entity
 public class UserEntity extends Entity<Long> implements IdAware<Long> {
