@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "io.github.m4gshm"
-version = "0.0.1-rc1"
+version = "0.0.1-rc2"
 
 allprojects {
     repositories {
