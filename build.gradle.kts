@@ -108,13 +108,11 @@ signing {
 
 nmcp {
     publishAllProjectsProbablyBreakingProjectIsolation {
-        val ossrhUsername = project.properties["ossrhUsername"] as String
-        val ossrhPassword = project.properties["ossrhPassword"] as String
+        val ossrhUsername = project.properties["ossrhUsername"] as String?
+        val ossrhPassword = project.properties["ossrhPassword"] as String?
         username.set(ossrhUsername)
         password.set(ossrhPassword)
-        // publish manually from the portal
         publicationType = "USER_MANAGED"
-//        // or if you want to publish automatically
 //        publicationType = "AUTOMATIC"
     }
 }
