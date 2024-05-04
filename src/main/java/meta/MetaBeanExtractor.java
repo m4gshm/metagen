@@ -5,9 +5,29 @@ import meta.MetaBean.BeanBuilder;
 import meta.MetaBean.Param;
 
 import javax.annotation.processing.Messager;
-import javax.lang.model.element.*;
-import javax.lang.model.type.*;
-import java.util.*;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.IntersectionType;
+import javax.lang.model.type.NoType;
+import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 import static java.beans.Introspector.decapitalize;
 import static java.util.Optional.of;
@@ -18,6 +38,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 import static javax.tools.Diagnostic.Kind.WARNING;
 import static meta.JavaPoetUtils.getUniqueName;
+import static meta.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 
 @RequiredArgsConstructor
 public class MetaBeanExtractor {
@@ -95,7 +116,7 @@ public class MetaBeanExtractor {
         var params = new ArrayList<Param>();
         for (int i = 0; i < parameters.size(); i++) {
             var paramName = parameters.get(i);
-            var paramType = arguments != null ? arguments.get(i) : paramName.asType();
+            var paramType = arguments != null && i < arguments.size() ? arguments.get(i) : paramName.asType();
             var evaluatedType = evalType(paramType);
             params.add(Param.builder()
                     .name(paramName)
@@ -147,7 +168,7 @@ public class MetaBeanExtractor {
     static String getAggregatorName(String beanPackage, Map<String, List<String>> classNamePerPack) {
         final String prefix;
         if (beanPackage != null) {
-            var packElements = classNamePerPack.get(beanPackage);
+            var packElements = classNamePerPack.computeIfAbsent(beanPackage, k -> new ArrayList<>());
             var delim = beanPackage.lastIndexOf('.');
             var packName = delim > 0 ? beanPackage.substring(delim + 1) : beanPackage;
             var letters = packName.toCharArray();
@@ -341,11 +362,11 @@ public class MetaBeanExtractor {
         return childPopulatedParams;
     }
 
-    public MetaBean getBean(TypeElement type) {
-        return getBean(type, extractGenericParams(type, null), type.getAnnotation(Meta.class), new HashMap<>());
+    public MetaBean getBean(TypeElement type, DeclaredType declaredType, String packageName, Meta annotation) {
+        return getBean(type, extractGenericParams(type, declaredType), packageName, annotation, new HashMap<>());
     }
 
-    private MetaBean getBean(TypeElement type, List<Param> typeParameters,
+    private MetaBean getBean(TypeElement type, List<Param> typeParameters, String packageName,
                              Meta meta, Map<TypeElement, MetaBean> touched) {
         if (type == null || isNoneType(type) || isJavaLang(type)) {
             return null;
@@ -375,7 +396,7 @@ public class MetaBeanExtractor {
                 property.setRecordComponent(recordComponent);
                 var accessor = recordComponent.getAccessor();
                 methods.put(getMethodName(accessor), accessor);
-                updateType(property, propType, typeParameters, annotationMirrors, meta, touched);
+                updateType(property, propType, typeParameters, packageName, annotationMirrors, meta, touched);
             }
         }
         var enclosedElements = type.getEnclosedElements();
@@ -421,7 +442,7 @@ public class MetaBeanExtractor {
                     if (getter || boolGetter) {
                         property.setGetter(ee);
                     }
-                    updateType(property, propType, typeParameters, annotationMirrors, meta, touched);
+                    updateType(property, propType, typeParameters, packageName, annotationMirrors, meta, touched);
                 }
             } else if (!isStatic && enclosedElement instanceof VariableElement ve) {
                 var propType = ve.asType();
@@ -429,39 +450,23 @@ public class MetaBeanExtractor {
                 var property = getProperty(properties, propName);
                 property.setField(ve);
                 property.setPublicField(isPublic);
-                updateType(property, propType, typeParameters, annotationMirrors, meta, touched);
+                updateType(property, propType, typeParameters, packageName, annotationMirrors, meta, touched);
             } else if (enclosedElement instanceof TypeElement te) {
                 nestedTypes.add(te);
             }
         }
 
         var superBean = ofNullable(getTypeInfo(type.getSuperclass())).map(superclass ->
-                getBean(superclass.typeElement, getParameters(typeParameters, superclass), meta, touched)
+                getBean(superclass.typeElement, getParameters(typeParameters, superclass), packageName, meta, touched)
         ).orElse(null);
 
-        var interfaceBeans = type.getInterfaces().stream().map(MetaBeanExtractor::getTypeInfo).filter(Objects::nonNull
-        ).map(iface -> getBean(iface.typeElement, getParameters(typeParameters, iface), meta, touched)).toList();
+        var interfaceBeans = type.getInterfaces().stream().map(MetaBeanExtractor::getTypeInfo)
+                .filter(Objects::nonNull)
+                .map(iface -> getBean(iface.typeElement, getParameters(typeParameters, iface), packageName, meta, touched))
+                .filter(Objects::nonNull)
+                .toList();
 
         var name = type.getSimpleName().toString();
-
-        var owner = type.getEnclosingElement();
-
-        var beanPackage = "";
-        var prefix = new StringBuilder();
-        if (owner instanceof PackageElement packageElement) {
-            beanPackage = packageElement.getQualifiedName().toString();
-        } else if (owner instanceof TypeElement externalClass) {
-            prefix = new StringBuilder(externalClass.getSimpleName().toString());
-            TypeElement superExternalClass;
-            while (null != (superExternalClass = getExternalClass(externalClass))) {
-                prefix.insert(0, superExternalClass.getSimpleName().toString());
-                externalClass = superExternalClass;
-            }
-
-            if (externalClass.getEnclosingElement() instanceof PackageElement packageElement) {
-                beanPackage = packageElement.getQualifiedName().toString();
-            }
-        }
 
         var suffix = ofNullable(meta).map(Meta::suffix).map(String::trim).filter(m -> !m.isEmpty()).orElse(Meta.META);
 
@@ -472,13 +477,14 @@ public class MetaBeanExtractor {
         var beanBuilder = detectBuilder
                 ? newBeanBuilder(messager, type, typeParameters, builderClassName, superBean != null ? superBean.getBeanBuilderInfo() : null)
                 : null;
+        var packageAndPrefix = newPackageAndPrefix(type);
 
         var metaBean = MetaBean.builder()
                 .isRecord(isRecord)
                 .type(type)
                 .meta(meta)
-                .name(prefix + name + suffix)
-                .packageName(beanPackage)
+                .name(packageAndPrefix.prefix() + name + suffix)
+                .packageName(packageName != null ? packageName : packageAndPrefix.beanPackage())
                 .superclass(superBean)
                 .interfaces(interfaceBeans)
                 .nestedTypes(nestedTypes)
@@ -494,8 +500,9 @@ public class MetaBeanExtractor {
     }
 
     private void updateType(MetaBean.Property property, TypeMirror propType,
-                            List<Param> typeParameters,
-                            List<? extends AnnotationMirror> annotations, Meta meta, Map<TypeElement, MetaBean> touched) {
+                            List<Param> typeParameters, String packageName,
+                            List<? extends AnnotationMirror> annotations, Meta meta,
+                            Map<TypeElement, MetaBean> touched) {
         var existType = property.getType();
         if (existType == null) {
             property.setType(propType);
@@ -503,7 +510,7 @@ public class MetaBeanExtractor {
             property.setEvaluatedType(evaluatedType);
 
             if (evaluatedType instanceof DeclaredType dt && dt.asElement() instanceof TypeElement te) {
-                property.setBean(this.getBean(te, typeParameters, meta, touched));
+                property.setBean(this.getBean(te, typeParameters, packageName, meta, touched));
             }
         }
         var propAnnotations = property.getAnnotations();
@@ -513,6 +520,29 @@ public class MetaBeanExtractor {
             propAnnotations.addAll(annotations);
         }
         property.setAnnotations(propAnnotations);
+    }
+
+    public record PackageAndPrefix(String beanPackage, StringBuilder prefix) {
+        public static PackageAndPrefix newPackageAndPrefix(TypeElement type) {
+            var owner = type.getEnclosingElement();
+            var beanPackage = "";
+            var prefix = new StringBuilder();
+            if (owner instanceof PackageElement packageElement) {
+                beanPackage = packageElement.getQualifiedName().toString();
+            } else if (owner instanceof TypeElement externalClass) {
+                prefix = new StringBuilder(externalClass.getSimpleName().toString());
+                TypeElement superExternalClass;
+                while (null != (superExternalClass = getExternalClass(externalClass))) {
+                    prefix.insert(0, superExternalClass.getSimpleName().toString());
+                    externalClass = superExternalClass;
+                }
+
+                if (externalClass.getEnclosingElement() instanceof PackageElement packageElement) {
+                    beanPackage = packageElement.getQualifiedName().toString();
+                }
+            }
+            return new PackageAndPrefix(beanPackage, prefix);
+        }
     }
 
     record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {

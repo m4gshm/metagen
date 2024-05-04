@@ -101,9 +101,11 @@ publishing {
     }
 }
 
-signing {
-    val extension = extensions.getByName("publishing") as PublishingExtension
-    sign(extension.publications)
+if (project.properties["signing.keyId"] != null) {
+    signing {
+        val extension = extensions.getByName("publishing") as PublishingExtension
+        sign(extension.publications)
+    }
 }
 
 nmcp {

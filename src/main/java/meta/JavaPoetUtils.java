@@ -1,16 +1,41 @@
 package meta;
 
-import io.jbock.javapoet.*;
+import io.jbock.javapoet.AnnotationSpec;
+import io.jbock.javapoet.ClassName;
+import io.jbock.javapoet.CodeBlock;
+import io.jbock.javapoet.FieldSpec;
+import io.jbock.javapoet.MethodSpec;
+import io.jbock.javapoet.ParameterSpec;
+import io.jbock.javapoet.ParameterizedTypeName;
+import io.jbock.javapoet.TypeName;
+import io.jbock.javapoet.TypeSpec;
+import io.jbock.javapoet.TypeVariableName;
+import io.jbock.javapoet.WildcardTypeName;
+import lombok.experimental.UtilityClass;
+import meta.Meta.Params;
 import meta.MetaBean.Param;
 import meta.MetaBean.Property;
 
 import javax.annotation.processing.Generated;
 import javax.annotation.processing.Messager;
-import javax.lang.model.element.*;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.RecordComponentElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -24,10 +49,17 @@ import static io.jbock.javapoet.WildcardTypeName.subtypeOf;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.IntStream.range;
-import static javax.lang.model.element.Modifier.*;
-import static meta.Meta.Content.*;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
+import static meta.Meta.Content.FULL;
+import static meta.Meta.Content.NAME;
+import static meta.Meta.Content.NONE;
 import static meta.MetaBeanExtractor.getMethodName;
 
+@UtilityClass
 public class JavaPoetUtils {
     public static TypeSpec.Builder newMetaTypeBuilder(
             Messager messager, MetaBean bean, Collection<? extends MetaCustomizer> customizers
@@ -38,7 +70,7 @@ public class JavaPoetUtils {
         var metaMethods = meta.map(Meta::methods);
 
         var propsEnum = props.map(Meta.Props::value).orElse(FULL);
-        var paramsEnum = parameters.map(Meta.Params::value).orElse(FULL);
+        var paramsEnum = parameters.map(Params::value).orElse(FULL);
         var methodsEnum = metaMethods.map(Meta.Methods::value).orElse(Meta.Methods.Content.NONE);
 
         var beanType = ClassName.get(bean.getType());
@@ -75,11 +107,10 @@ public class JavaPoetUtils {
         var addInheritParamsOf = false;
 
         if (paramsEnum != NONE) {
-            var params = parameters.get();
-            var typeName = getUniqueName(params.className(), uniqueNames);
-            var methodName = params.methodName();
+            var typeName = getUniqueName(parameters.map(Params::className).orElse(Params.CLASS_NAME), uniqueNames);
+            var methodName = parameters.map(Params::methodName).orElse(Params.METHOD_NAME);
 
-            inheritParams = Meta.Params.METHOD_NAME.equals(methodName) && paramsEnum == FULL;
+            inheritParams = Params.METHOD_NAME.equals(methodName) && paramsEnum == FULL;
             if (addParamsType) {
                 builder.addType(newParamsType(typeName, typeParameters, paramsEnum));
             }
@@ -94,19 +125,21 @@ public class JavaPoetUtils {
 
             var inheritedParamsFieldInitializer = CodeBlock.builder().add("$T.ofEntries(\n", Map.class);
 
-            var inherited = params.inherited();
-            var parentClass = inherited != null ? inherited.parentClass() : null;
+            var inherited = parameters.map(Params::inherited);
+            var parentClass = inherited.map(Params.Inherited::parentClass);
             var superTypeParams = superclass != null ? superclass.getTypeParameters() : List.<Param>of();
-            var addSuperParams = !superTypeParams.isEmpty() && parentClass != null && parentClass.enumerate();
+            var addSuperParams = !superTypeParams.isEmpty() && parentClass.map(Params.Inherited.Super::enumerate).orElse(true);
             if (addSuperParams) {
-                inheritSuperParams = Meta.Params.Inherited.Super.METHOD_NAME.equals(parentClass.methodName()) && paramsEnum == FULL;
+                inheritSuperParams = Params.Inherited.Super.METHOD_NAME.equals(parentClass.map(Params.Inherited.Super::methodName)
+                        .orElse(Params.Inherited.Super.METHOD_NAME)) && paramsEnum == FULL;
                 var superTypeName = getUniqueName(
-                        superclass.getClassName() + parentClass.classNameSuffix(), uniqueNames
+                        superclass.getClassName() + parentClass.map(Params.Inherited.Super::classNameSuffix)
+                                .orElse(Params.Inherited.Super.CLASS_NAME_SUFFIX), uniqueNames
                 );
                 builder.addType(newParamsType(superTypeName, superTypeParams, paramsEnum));
                 if (paramsEnum == FULL) {
                     builder.addMethod(callValuesMethod(
-                            parentClass.methodName(),
+                            parentClass.map(Params.Inherited.Super::methodName).orElse(Params.Inherited.Super.METHOD_NAME),
                             ClassName.get("", superTypeName),
                             wildcardParametrized(ClassName.get("", superTypeName), 1),
                             inheritSuperParams
@@ -114,7 +147,7 @@ public class JavaPoetUtils {
                 }
                 addInheritedParams(
                         inheritedParamsFieldInitializer,
-                        ClassName.get(Meta.Params.Inherited.Super.class),
+                        ClassName.get(Params.Inherited.Super.class),
                         superTypeName, false
                 );
                 addInheritedParams(
@@ -124,13 +157,15 @@ public class JavaPoetUtils {
                 );
             }
 
-            var interfacesParams = inherited != null ? inherited.interfaces() : null;
-            if (interfacesParams != null && interfaces != null && !interfaces.isEmpty() && interfacesParams.enumerate()) {
-                inheritParamsOf = Meta.Params.Inherited.Interfaces.METHOD_NAME.equals(interfacesParams.methodName()) && paramsEnum == FULL;
+            var interfacesParams = inherited.map(Params.Inherited::interfaces);
+            if (interfaces != null && !interfaces.isEmpty() && interfacesParams.map(Params.Inherited.Interfaces::enumerate).orElse(true)) {
+                inheritParamsOf = Params.Inherited.Interfaces.METHOD_NAME.equals(interfacesParams.map(Params.Inherited.Interfaces::methodName)
+                        .orElse(Params.Inherited.Interfaces.METHOD_NAME)) && paramsEnum == FULL;
                 for (int i = 0; i < interfaces.size(); i++) {
                     var iface = interfaces.get(i);
                     var ifaceParametersEnumName = getUniqueName(
-                            iface.getClassName() + interfacesParams.classNameSuffix(), uniqueNames
+                            iface.getClassName() + interfacesParams.map(Params.Inherited.Interfaces::classNameSuffix)
+                                    .orElse(Params.Inherited.Interfaces.CLASS_NAME_SUFFIX), uniqueNames
                     );
                     builder.addType(newParamsType(ifaceParametersEnumName, iface.getTypeParameters(), paramsEnum));
                     addInheritedParams(
@@ -144,9 +179,11 @@ public class JavaPoetUtils {
                     addInheritParamsOf = true;
                     builder.addField(inheritedParamsField.build());
                     builder.addMethod(returnListMethodBuilder(
-                            interfacesParams.methodName(),
+                            interfacesParams.map(Params.Inherited.Interfaces::methodName)
+                                    .orElse(Params.Inherited.Interfaces.METHOD_NAME),
                             subtypeOf(wildcardParametrized(ClassName.get(Typed.class), 1)),
-                            CodeBlock.builder().addStatement("return $L.get(type)", inheritedParamsFieldName).build(), inheritParamsOf
+                            CodeBlock.builder().addStatement("return $L.get(type)", inheritedParamsFieldName).build(),
+                            inheritParamsOf
                     ).addParameter(ParameterSpec.builder(Class.class, "type").build()).build());
                 }
             }
@@ -164,9 +201,8 @@ public class JavaPoetUtils {
         var inheritProps = false;
         if (propsEnum != NONE) {
             var propsLevelUniqueNames = new HashSet<String>();
-            var propsInfo = props.get();
-            inheritProps = Meta.Props.METHOD_NAME.equals(propsInfo.methodName()) && propsEnum == FULL;
-            var typeName = ClassName.get("", getUniqueName(propsInfo.className(), uniqueNames));
+            inheritProps = Meta.Props.METHOD_NAME.equals(props.map(Meta.Props::methodName).orElse(Meta.Props.METHOD_NAME)) && propsEnum == FULL;
+            var typeName = ClassName.get("", getUniqueName(props.map(Meta.Props::className).orElse(Meta.Props.CLASS_NAME), uniqueNames));
             var typeVariable = TypeVariableName.get("T");
             var propsClassBuilder = propsEnum == FULL
                     ? typeAwareClass(typeName, typeVariable)
@@ -197,15 +233,23 @@ public class JavaPoetUtils {
 
             var allReadable = true;
             var allWritable = true;
+            Class<? extends Throwable> getterChecked = null;
+            Class<? extends Throwable> setterChecked = null;
             for (var property : propertyPerName.values()) {
+                if (getterChecked == null) {
+                    getterChecked = getCheckedException(property.getGetter());
+                }
+                if (setterChecked == null) {
+                    setterChecked = getCheckedException(property.getSetter());
+                }
                 allReadable &= isReadable(property);
                 allWritable &= isWriteable(property);
             }
 
             var getterName = "getter";
             var setterName = "setter";
-            var getterType = getFunctionType(beanType, typeVariable);
-            var setterType = getBiConsumerType(beanType, typeVariable);
+            var getterType = getFunctionType(beanType, typeVariable, getterChecked);
+            var setterType = getBiConsumerType(beanType, typeVariable, setterChecked);
             var nameArgType = ClassName.get(String.class);
             var typeArgType = typeClassOf(typeVariable);
 
@@ -299,7 +343,9 @@ public class JavaPoetUtils {
             if (propsEnum == FULL) {
                 var readWriteInterface = ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable);
                 var writeInterface = writeInterface(beanType, typeVariable);
-                var readInterface = ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
+                var readInterface = getterChecked != null
+                        ? ParameterizedTypeName.get(ClassName.get(CheckedRead.class), beanType, typeVariable, ClassName.get(getterChecked))
+                        : ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
 
                 if (rwUsed && !readWriteTypeName.equals(typeName)) {
                     var extendsReadType = readTypeName.equals(typeName);
@@ -322,9 +368,9 @@ public class JavaPoetUtils {
                             .addMethod(constructor.build());
 
                     if (!extendsReadType) {
-                        addGetter(subType, beanType, typeVariable, getterType, getterName);
+                        addGetter(subType, beanType, typeVariable, getterType, getterName, getterChecked);
                     }
-                    addSetter(subType, beanType, typeVariable, setterType, setterName, "set", "bean", true);
+                    addSetter(subType, beanType, typeVariable, setterType, setterName, "set", "bean", true, setterChecked);
 
                     propsClassBuilder.addType(subType.build());
                 }
@@ -341,7 +387,7 @@ public class JavaPoetUtils {
                             .addSuperinterface(readInterface)
                             .addMethod(constructor.build());
 
-                    addGetter(subType, beanType, typeVariable, getterType, getterName);
+                    addGetter(subType, beanType, typeVariable, getterType, getterName, getterChecked);
 
                     propsClassBuilder.addType(subType.build());
                 }
@@ -358,7 +404,7 @@ public class JavaPoetUtils {
                             .addSuperinterface(writeInterface)
                             .addMethod(constructor.build());
 
-                    addSetter(subType, beanType, typeVariable, setterType, setterName, "set", "bean", true);
+                    addSetter(subType, beanType, typeVariable, setterType, setterName, "set", "bean", true, setterChecked);
 
                     propsClassBuilder.addType(subType.build());
                 }
@@ -377,9 +423,9 @@ public class JavaPoetUtils {
 
                 if (allReadable) {
                     var getterFieldName = getUniqueName("getter", uniqueNames);
-                    var getterFunction = getFunctionType(beanType, typeVariable);
+                    var getterFunction = getFunctionType(beanType, typeVariable, getterChecked);
 
-                    addGetter(propsClassBuilder, beanType, typeVariable, getterFunction, getterFieldName);
+                    addGetter(propsClassBuilder, beanType, typeVariable, getterFunction, getterFieldName, getterChecked);
 
                     constructor.addParameter(getterFunction, "getter");
                     constructorBody.addStatement("this." + getterFieldName + " = " + "getter");
@@ -387,9 +433,9 @@ public class JavaPoetUtils {
 
                 if (allWritable) {
                     var setterFieldName = getUniqueName("setter", uniqueNames);
-                    var setterConsumer = getBiConsumerType(beanType, typeVariable);
+                    var setterConsumer = getBiConsumerType(beanType, typeVariable, setterChecked);
 
-                    addSetter(propsClassBuilder, beanType, typeVariable, setterConsumer, setterFieldName, "set", "bean", true);
+                    addSetter(propsClassBuilder, beanType, typeVariable, setterConsumer, setterFieldName, "set", "bean", true, setterChecked);
 
                     constructor.addParameter(setterConsumer, "setter");
                     constructorBody.addStatement("this." + setterFieldName + " = " + "setter");
@@ -413,7 +459,7 @@ public class JavaPoetUtils {
             builder.addType(propsClassBuilder.build());
             if (propsEnum == FULL) {
                 builder.addMethod(callValuesMethod(
-                        propsInfo.methodName(),
+                        props.map(Meta.Props::methodName).orElse(Meta.Props.METHOD_NAME),
                         typeName,
                         wildcardParametrized(typeName, 1),
                         inheritProps));
@@ -471,9 +517,7 @@ public class JavaPoetUtils {
         }
 
         if (paramsEnum == FULL && propsEnum == FULL) {
-            builder.addField(FieldSpec.builder(
-                    ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
-            ).initializer(CodeBlock.of("new $L()", name)).build());
+            builder.addField(instanceField(name));
 
             builder.addField(typeField);
             builder.addMethod(typeGetter.build());
@@ -518,6 +562,38 @@ public class JavaPoetUtils {
         }
 
         return builder;
+    }
+
+    private static Class<? extends Throwable> getCheckedException(ExecutableElement method) {
+        return (method != null ? method.getThrownTypes() : List.<TypeMirror>of()).stream()
+                .map(typeMirror -> typeMirror instanceof DeclaredType declaredType ? declaredType.asElement() : null)
+                .map(element -> element instanceof TypeElement typeElement ? typeElement : null)
+                .filter(Objects::nonNull)
+                .map(JavaPoetUtils::geCheckedException)
+                .filter(Objects::nonNull)
+                .findFirst().orElse(null);
+    }
+
+    private static Class<? extends Throwable> geCheckedException(TypeElement typeElement) {
+        var name = typeElement.getQualifiedName().toString();
+        if (Exception.class.getName().equals(name)) {
+            return Exception.class;
+        } else if (Throwable.class.getName().equals(name)) {
+            return Throwable.class;
+        } else if (RuntimeException.class.getName().equals(name)) {
+            return null;
+        } else if (typeElement.getSuperclass() instanceof DeclaredType declaredType
+                && declaredType.asElement() instanceof TypeElement superElement) {
+            return geCheckedException(superElement);
+        } else {
+            return null;
+        }
+    }
+
+    public static FieldSpec instanceField(String name) {
+        return FieldSpec.builder(
+                ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
+        ).initializer("new $L()", name).build();
     }
 
     private static void addProperties(MetaBean bean, Map<String, Property> propertyPerName,
@@ -566,7 +642,7 @@ public class JavaPoetUtils {
             return;
         }
         for (var iface : interfaces) {
-            List<Property> properties = iface.getPublicProperties();
+            var properties = iface.getPublicProperties();
             for (var property : properties) {
                 addInheritedProp(property, propertyPerName, usedWeights, weight);
             }
@@ -726,42 +802,58 @@ public class JavaPoetUtils {
 
     public static void addGetter(
             TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar,
-            ParameterizedTypeName getterType, String getterFieldName
-    ) {
+            ParameterizedTypeName getterType, String getterFieldName,
+            Class<? extends Throwable> getterChecked) {
         builder.addField(FieldSpec.builder(getterType, getterFieldName).addModifiers(PUBLIC, FINAL).build());
-        builder.addMethod(
-                methodBuilder("get")
-                        .addAnnotation(Override.class)
-                        .addModifiers(PUBLIC)
-                        .addParameter(beanType, "bean")
-                        .returns(propertyTypeVar)
-                        .addStatement("return this." + getterFieldName + ".apply(bean)")
-                        .build()
-        );
+        var methodBuilder = methodBuilder("get")
+                .addAnnotation(Override.class)
+                .addModifiers(PUBLIC)
+                .addParameter(beanType, "bean")
+                .returns(propertyTypeVar)
+                .addStatement("return this." + getterFieldName + ".apply(bean)");
+        if (getterChecked != null) {
+            methodBuilder.addException(ClassName.get(getterChecked));
+        }
+        builder.addMethod(methodBuilder.build());
     }
 
     public static void addSetter(
             TypeSpec.Builder builder, TypeName beanType, TypeVariableName propertyTypeVar,
-            ParameterizedTypeName setterType, String fieldName, String methodName, String argName, boolean overr
-    ) {
+            ParameterizedTypeName setterType, String fieldName, String methodName, String argName, boolean overr,
+            Class<? extends Throwable> setterChecked) {
         builder.addField(FieldSpec.builder(setterType, fieldName).addModifiers(PUBLIC, FINAL).build());
-        var method = methodBuilder(methodName)
+        var methodBuilder = methodBuilder(methodName)
                 .addModifiers(PUBLIC)
                 .addParameter(beanType, argName)
                 .addParameter(propertyTypeVar, "value")
                 .addStatement(fieldName + ".accept(" + argName + ", value)");
         if (overr) {
-            method.addAnnotation(Override.class);
+            methodBuilder.addAnnotation(Override.class);
         }
-        builder.addMethod(method.build());
+        if (setterChecked != null) {
+            methodBuilder.addException(ClassName.get(setterChecked));
+        }
+        builder.addMethod(methodBuilder.build());
     }
 
-    public static ParameterizedTypeName getFunctionType(ClassName beanType, TypeVariableName propertyTypeVar) {
-        return ParameterizedTypeName.get(ClassName.get(Function.class), beanType, propertyTypeVar);
+    public static ParameterizedTypeName getFunctionType(
+            ClassName beanType, TypeVariableName propertyTypeVar, Class<? extends Throwable> throwsChecked
+    ) {
+        return throwsChecked != null
+                ? ParameterizedTypeName.get(
+                ClassName.get(CheckedFunction.class), beanType, propertyTypeVar,
+                ClassName.get(throwsChecked))
+                : ParameterizedTypeName.get(ClassName.get(Function.class), beanType, propertyTypeVar);
     }
 
-    public static ParameterizedTypeName getBiConsumerType(TypeName beanType, TypeVariableName propertyTypeVar) {
-        return ParameterizedTypeName.get(ClassName.get(BiConsumer.class), beanType, propertyTypeVar);
+    public static ParameterizedTypeName getBiConsumerType(
+            TypeName beanType, TypeVariableName propertyTypeVar, Class<? extends Throwable> setterChecked
+    ) {
+        return setterChecked != null
+                ? ParameterizedTypeName.get(
+                ClassName.get(CheckedBiConsumer.class), beanType, propertyTypeVar,
+                ClassName.get(setterChecked))
+                : ParameterizedTypeName.get(ClassName.get(BiConsumer.class), beanType, propertyTypeVar);
     }
 
     public static TypeSpec.Builder typeAwareClass(ClassName className, TypeVariableName typeVariable) {
@@ -812,6 +904,7 @@ public class JavaPoetUtils {
         var typeVariable = TypeVariableName.get("T");
         var builder = typeAwareClass(className, typeVariable).addModifiers(FINAL);
 
+        Class<? extends Throwable> setterChecked = null;
         var setterNames = new ArrayList<String>();
         for (var setter : builderInfo.getSetters()) {
             var setterName = setter.getName();
@@ -820,6 +913,9 @@ public class JavaPoetUtils {
                     TypeName.get(setter.getEvaluatedType()), null, false, null,
                     setter.getSetter(), null).build());
             setterNames.add(setterName);
+            if (setterChecked == null) {
+                setterChecked = getCheckedException(setter.getSetter());
+            }
         }
         var uniqueNames = new HashSet<>(setterNames);
 
@@ -830,7 +926,7 @@ public class JavaPoetUtils {
 
         var nameArgType = ClassName.get(String.class);
         var typeArgType = typeClassOf(typeVariable);
-        var setterType = getBiConsumerType(beanType, typeVariable);
+        var setterType = getBiConsumerType(beanType, typeVariable, setterChecked);
 
         populateTypeAwareClass(builder, nameFieldName, typeFieldName, nameArgType, typeArgType);
 

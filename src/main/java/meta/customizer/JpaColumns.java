@@ -398,10 +398,10 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         var builderTypeFieldName = getUniqueName("builderType", uniqueNames);
         var builderSetterFieldName = getUniqueName("builderSetter", uniqueNames);
 
-        var getterType = getFunctionType(beanClass, typeVariable);
-        var setterType = getBiConsumerType(beanClass, typeVariable);
+        var getterType = getFunctionType(beanClass, typeVariable, null);
+        var setterType = getBiConsumerType(beanClass, typeVariable, null);
         var builderType = builderTypeVariable;
-        var builderSetterType = getBiConsumerType(builderTypeVariable, typeVariable);
+        var builderSetterType = getBiConsumerType(builderTypeVariable, typeVariable, null);
 
         constructor
                 .addParameter(pkArgType, "pk")
@@ -437,9 +437,9 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
 
         populateTypeAwareClass(jpaColumnsClass, nameFieldName, typeFieldName, nameArgType, typeArgType);
 
-        addGetter(jpaColumnsClass, beanClass, typeVariable, getterType, getterFieldName);
+        addGetter(jpaColumnsClass, beanClass, typeVariable, getterType, getterFieldName, null);
         if (allWriteable) {
-            addSetter(jpaColumnsClass, beanClass, typeVariable, setterType, setterFieldName, "set", "bean", true);
+            addSetter(jpaColumnsClass, beanClass, typeVariable, setterType, setterFieldName, "set", "bean", true, null);
         }
         if (allBuildable) {
             var typeGetter = methodBuilder("builderType")
@@ -449,7 +449,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
                             .addStatement("return " + builderTypeFieldName)
                             .build());
             jpaColumnsClass.addMethod(typeGetter.build());
-            addSetter(jpaColumnsClass, builderTypeVariable, typeVariable, builderSetterType, builderSetterFieldName, "apply", "builder", false);
+            addSetter(jpaColumnsClass, builderTypeVariable, typeVariable, builderSetterType, builderSetterFieldName, "apply", "builder", false, null);
         }
 
         addValues(jpaColumnsClass, className, columnNames, allBuildable ? 2 : 1, uniqueNames);

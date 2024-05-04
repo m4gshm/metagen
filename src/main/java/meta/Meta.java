@@ -11,7 +11,7 @@ import static meta.Meta.Content.FULL;
  * Applies the metadata generator for a marked class.
  * The generator creates a metadata class contains information about bean properties and type parameters of the marked class.
  */
-@Target(TYPE)
+@Target({TYPE, FIELD})
 @Retention(SOURCE)
 public @interface Meta {
     String META = "Meta";
