@@ -1,6 +1,5 @@
-package example.exterpack;
+package example.modules;
 
-import meta.Meta;
 import meta.Module;
 
 import java.net.URL;
