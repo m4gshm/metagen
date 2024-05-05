@@ -824,7 +824,7 @@ public class JavaPoetUtils {
 
     public static void addSetter(
             TypeSpec.Builder builder, TypeName beanType, TypeVariableName propertyTypeVar,
-            ParameterizedTypeName setterType, String fieldName, String methodName, String argName, boolean overr,
+            ParameterizedTypeName setterType, String fieldName, String methodName, String argName, boolean override,
             Class<? extends Throwable> setterChecked) {
         builder.addField(FieldSpec.builder(setterType, fieldName).addModifiers(PUBLIC, FINAL).build());
         var methodBuilder = methodBuilder(methodName)
@@ -832,7 +832,7 @@ public class JavaPoetUtils {
                 .addParameter(beanType, argName)
                 .addParameter(propertyTypeVar, "value")
                 .addStatement(fieldName + ".accept(" + argName + ", value)");
-        if (overr) {
+        if (override) {
             methodBuilder.addAnnotation(Override.class);
         }
         if (setterChecked != null) {
@@ -880,18 +880,20 @@ public class JavaPoetUtils {
                 .addStatement("this." + typeName + " = " + "type");
     }
 
-    static MethodSpec callValuesMethod(String name, ClassName typeClassName, TypeName returnType, boolean overr) {
+    static MethodSpec callValuesMethod(String name, ClassName typeClassName, TypeName returnType, boolean override) {
         return returnListMethodBuilder(name, returnType,
-                CodeBlock.builder().addStatement("return $T.values()", typeClassName).build(), overr
+                CodeBlock.builder().addStatement("return $T.values()", typeClassName).build(), override
         ).build();
     }
 
-    static MethodSpec.Builder returnListMethodBuilder(String name, TypeName typeClassName, CodeBlock code, boolean overr) {
+    static MethodSpec.Builder returnListMethodBuilder(
+            String name, TypeName typeClassName, CodeBlock code, boolean override
+    ) {
         var builder = methodBuilder(name)
                 .addModifiers(PUBLIC)
                 .returns(ParameterizedTypeName.get(ClassName.get(List.class), typeClassName))
                 .addCode(code);
-        if (overr) {
+        if (override) {
             builder.addAnnotation(Override.class);
         }
         return builder;
