@@ -1,13 +1,21 @@
-package meta;
+package meta.util;
 
 import lombok.Builder;
 import lombok.Data;
+import meta.Meta;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
+import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.RecordComponentElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static javax.lang.model.element.Modifier.PUBLIC;
 
@@ -15,9 +23,8 @@ import static javax.lang.model.element.Modifier.PUBLIC;
  * Bean metadata model.
  */
 @Data
-@Builder(toBuilder = true)
 public class MetaBean {
-    private TypeElement type;
+    private final TypeElement type;
     private String name;
     private String packageName;
     private List<ExecutableElement> methods;
@@ -40,6 +47,19 @@ public class MetaBean {
 
     public String getClassName() {
         return type.getSimpleName().toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        var metaBean = (MetaBean) o;
+        return Objects.equals(type, metaBean.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(type);
     }
 
     @Data

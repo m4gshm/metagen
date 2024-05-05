@@ -1,35 +1,77 @@
 package meta.customizer;
 
-import io.jbock.javapoet.*;
+import io.jbock.javapoet.ClassName;
+import io.jbock.javapoet.CodeBlock;
+import io.jbock.javapoet.FieldSpec;
+import io.jbock.javapoet.ParameterizedTypeName;
+import io.jbock.javapoet.TypeName;
+import io.jbock.javapoet.TypeSpec;
+import io.jbock.javapoet.TypeVariableName;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import meta.*;
-import meta.MetaBean.BeanBuilder;
-import meta.MetaBean.BeanBuilder.Setter;
+import meta.util.ClassLoadUtility;
+import meta.util.MetaBean;
+import meta.util.MetaBean.BeanBuilder;
+import meta.util.MetaBean.BeanBuilder.Setter;
+import meta.MetaCustomizer;
+import meta.util.ReadWrite;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.ExecutableElement;
 import java.lang.annotation.Retention;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static java.lang.Boolean.FALSE;
 import static java.lang.Boolean.TRUE;
-import static java.lang.Character.*;
+import static java.lang.Character.isLowerCase;
+import static java.lang.Character.isUpperCase;
+import static java.lang.Character.toUpperCase;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static java.util.Arrays.stream;
 import static java.util.Collections.reverse;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
-import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PUBLIC;
+import static javax.lang.model.element.Modifier.STATIC;
 import static javax.tools.Diagnostic.Kind.OTHER;
-import static meta.JavaPoetUtils.*;
-import static meta.MetaBeanExtractor.isEquals;
+import static meta.util.JavaPoetUtils.addFieldWithReadAccessor;
+import static meta.util.JavaPoetUtils.addGetter;
+import static meta.util.JavaPoetUtils.addSetter;
+import static meta.util.JavaPoetUtils.addValues;
+import static meta.util.JavaPoetUtils.dotClass;
+import static meta.util.JavaPoetUtils.enumConstructorArgs;
+import static meta.util.JavaPoetUtils.getBiConsumerType;
+import static meta.util.JavaPoetUtils.getFunctionType;
+import static meta.util.JavaPoetUtils.getGetterCallCode;
+import static meta.util.JavaPoetUtils.getGetterCallInitByNewCode;
+import static meta.util.JavaPoetUtils.getSetterCallCode;
+import static meta.util.JavaPoetUtils.getUniqueName;
+import static meta.util.JavaPoetUtils.isWriteable;
+import static meta.util.JavaPoetUtils.newInstanceCall;
+import static meta.util.JavaPoetUtils.populateConstructor;
+import static meta.util.JavaPoetUtils.populateTypeAwareClass;
+import static meta.util.JavaPoetUtils.readInterface;
+import static meta.util.JavaPoetUtils.typeAwareClass;
+import static meta.util.JavaPoetUtils.typeClassOf;
+import static meta.util.JavaPoetUtils.unboxedTypeVarName;
+import static meta.util.JavaPoetUtils.wildcardParametrized;
+import static meta.util.MetaBeanExtractor.isEquals;
 
 /**
  * Generates JPA based metadata like column name, primary key, embedded types.
@@ -372,7 +414,8 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         }
         jpaColumnsClass.addSuperinterface(allWriteable
                 ? ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanClass, typeVariable)
-                : ParameterizedTypeName.get(ClassName.get(Read.class), beanClass, typeVariable));
+                : readInterface(beanClass, typeVariable, null)
+        );
 
         for (var column : columns) {
             columnNames.add(addColumnConst(column, className, jpaColumnsClass, allWriteable, allBuildable));

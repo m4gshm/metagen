@@ -1,14 +1,15 @@
-package meta;
+package meta.util;
 
 import io.jbock.javapoet.ClassName;
 import io.jbock.javapoet.CodeBlock;
-import io.jbock.javapoet.FieldSpec;
 import io.jbock.javapoet.JavaFile;
 import io.jbock.javapoet.ParameterSpec;
 import io.jbock.javapoet.ParameterizedTypeName;
 import io.jbock.javapoet.TypeSpec;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
+import meta.MetaCustomizer;
+import meta.MetaModel;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -32,15 +33,14 @@ import static java.util.stream.Collectors.toMap;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
-import static meta.JavaPoetUtils.dotClass;
-import static meta.JavaPoetUtils.generatedAnnotation;
-import static meta.JavaPoetUtils.initMapByEntries;
-import static meta.JavaPoetUtils.instanceField;
-import static meta.JavaPoetUtils.mapField;
-import static meta.JavaPoetUtils.newMetaTypeBuilder;
-import static meta.MetaBeanExtractor.getAggregatorName;
-import static meta.MetaBeanExtractor.getPackageClass;
+import static meta.util.JavaPoetUtils.dotClass;
+import static meta.util.JavaPoetUtils.generatedAnnotation;
+import static meta.util.JavaPoetUtils.initMapByEntries;
+import static meta.util.JavaPoetUtils.instanceField;
+import static meta.util.JavaPoetUtils.mapField;
+import static meta.util.JavaPoetUtils.newMetaTypeBuilder;
+import static meta.util.MetaBeanExtractor.getAggregatorName;
+import static meta.util.MetaBeanExtractor.getPackageClass;
 
 @UtilityClass
 public class WriteClassFileUtils {

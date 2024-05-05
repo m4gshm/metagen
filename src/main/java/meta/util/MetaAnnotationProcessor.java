@@ -1,6 +1,7 @@
-package meta;
+package meta.util;
 
 import lombok.SneakyThrows;
+import meta.Meta;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -11,7 +12,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static javax.lang.model.SourceVersion.RELEASE_17;
-import static meta.WriteClassFileUtils.writeFiles;
+import static meta.util.WriteClassFileUtils.writeFiles;
 
 /**
  * The metadata generator

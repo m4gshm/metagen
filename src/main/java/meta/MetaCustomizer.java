@@ -1,12 +1,15 @@
 package meta;
 
+import meta.util.MetaBean;
+import meta.util.MetaCustomizerException;
+
 import javax.annotation.processing.Messager;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.Map;
 
 import static java.util.stream.Collectors.toMap;
-import static meta.ClassLoadUtility.load;
+import static meta.util.ClassLoadUtility.load;
 
 /**
  * The metadata customizer contract.

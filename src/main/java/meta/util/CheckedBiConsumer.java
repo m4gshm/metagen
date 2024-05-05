@@ -1,4 +1,4 @@
-package meta;
+package meta.util;
 
 @FunctionalInterface
 public interface CheckedBiConsumer<T, U, E extends Throwable> {

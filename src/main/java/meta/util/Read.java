@@ -1,4 +1,4 @@
-package meta;
+package meta.util;
 
 /**
  * Read property accessor.

@@ -1,4 +1,6 @@
-package meta;
+package meta.util;
+
+import meta.Typed;
 
 import java.util.List;
 

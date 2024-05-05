@@ -1,2 +1,2 @@
-meta.MetaAnnotationProcessor
-meta.ModuleAnnotationProcessor
+meta.util.MetaAnnotationProcessor
+meta.util.ModuleAnnotationProcessor

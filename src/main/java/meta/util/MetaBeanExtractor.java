@@ -1,8 +1,9 @@
-package meta;
+package meta.util;
 
 import lombok.RequiredArgsConstructor;
-import meta.MetaBean.BeanBuilder;
-import meta.MetaBean.Param;
+import meta.Meta;
+import meta.util.MetaBean.BeanBuilder;
+import meta.util.MetaBean.Param;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
@@ -37,8 +38,8 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 import static javax.tools.Diagnostic.Kind.WARNING;
-import static meta.JavaPoetUtils.getUniqueName;
-import static meta.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
+import static meta.util.JavaPoetUtils.getUniqueName;
+import static meta.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 
 @RequiredArgsConstructor
 public class MetaBeanExtractor {
@@ -49,17 +50,18 @@ public class MetaBeanExtractor {
 
     static boolean isBoolGetter(ExecutableElement executableElement) {
         var name = getMethodName(executableElement);
-        return name.length() > 2 && name.startsWith("is") && executableElement.getReturnType().getKind() == BOOLEAN;
+        return name.length() > 2 && name.startsWith("is") && executableElement.getReturnType().getKind() == BOOLEAN
+                && executableElement.getParameters().isEmpty();
     }
 
     static boolean isSetter(ExecutableElement executableElement) {
         var name = getMethodName(executableElement);
-        return name.length() > 3 && name.startsWith("set");
+        return name.length() > 3 && name.startsWith("set") && executableElement.getParameters().size() == 1;
     }
 
     static boolean isGetter(ExecutableElement executableElement) {
         var name = getMethodName(executableElement);
-        return name.length() > 3 && name.startsWith("get");
+        return name.length() > 3 && name.startsWith("get") && executableElement.getParameters().isEmpty();
     }
 
     static String getMethodName(ExecutableElement ee) {
@@ -377,6 +379,9 @@ public class MetaBeanExtractor {
             return exists;
         }
 
+        var metaBean = new MetaBean(type);
+        touched.put(type, metaBean);
+
         var isRecord = false;
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
@@ -479,22 +484,17 @@ public class MetaBeanExtractor {
                 : null;
         var packageAndPrefix = newPackageAndPrefix(type);
 
-        var metaBean = MetaBean.builder()
-                .isRecord(isRecord)
-                .type(type)
-                .meta(meta)
-                .name(packageAndPrefix.prefix() + name + suffix)
-                .packageName(packageName != null ? packageName : packageAndPrefix.beanPackage())
-                .superclass(superBean)
-                .interfaces(interfaceBeans)
-                .nestedTypes(nestedTypes)
-                .methods(new ArrayList<>(methods.values()))
-                .properties(new ArrayList<>(properties.values()))
-                .typeParameters(typeParameters)
-                .beanBuilderInfo(beanBuilder)
-                .build();
-
-        touched.put(type, metaBean);
+        metaBean.setRecord(isRecord);
+        metaBean.setMeta(meta);
+        metaBean.setName(packageAndPrefix.prefix() + name + suffix);
+        metaBean.setPackageName(packageName != null ? packageName : packageAndPrefix.beanPackage());
+        metaBean.setSuperclass(superBean);
+        metaBean.setInterfaces(interfaceBeans);
+        metaBean.setNestedTypes(nestedTypes);
+        metaBean.setMethods(new ArrayList<>(methods.values()));
+        metaBean.setProperties(new ArrayList<>(properties.values()));
+        metaBean.setTypeParameters(typeParameters);
+        metaBean.setBeanBuilderInfo(beanBuilder);
 
         return metaBean;
     }

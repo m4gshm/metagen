@@ -1,4 +1,6 @@
-package meta;
+package meta.util;
+
+import meta.MetaCustomizer;
 
 import javax.lang.model.type.TypeMirror;
 

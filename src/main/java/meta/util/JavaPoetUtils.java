@@ -1,4 +1,4 @@
-package meta;
+package meta.util;
 
 import io.jbock.javapoet.AnnotationSpec;
 import io.jbock.javapoet.ClassName;
@@ -12,9 +12,15 @@ import io.jbock.javapoet.TypeSpec;
 import io.jbock.javapoet.TypeVariableName;
 import io.jbock.javapoet.WildcardTypeName;
 import lombok.experimental.UtilityClass;
+import meta.Meta;
 import meta.Meta.Params;
-import meta.MetaBean.Param;
-import meta.MetaBean.Property;
+import meta.MetaCustomizer;
+import meta.MetaModel;
+import meta.ParametersAware;
+import meta.PropertiesAware;
+import meta.Typed;
+import meta.util.MetaBean.Param;
+import meta.util.MetaBean.Property;
 
 import javax.annotation.processing.Generated;
 import javax.annotation.processing.Messager;
@@ -57,7 +63,7 @@ import static javax.lang.model.element.Modifier.STATIC;
 import static meta.Meta.Content.FULL;
 import static meta.Meta.Content.NAME;
 import static meta.Meta.Content.NONE;
-import static meta.MetaBeanExtractor.getMethodName;
+import static meta.util.MetaBeanExtractor.getMethodName;
 
 @UtilityClass
 public class JavaPoetUtils {
@@ -341,11 +347,10 @@ public class JavaPoetUtils {
             }
 
             if (propsEnum == FULL) {
-                var readWriteInterface = ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable);
-                var writeInterface = writeInterface(beanType, typeVariable);
-                var readInterface = getterChecked != null
-                        ? ParameterizedTypeName.get(ClassName.get(CheckedRead.class), beanType, typeVariable, ClassName.get(getterChecked))
-                        : ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
+                var readWriteInterface = readWriteInterface(beanType, typeVariable,
+                        getterChecked, setterChecked);
+                var writeInterface = writeInterface(beanType, typeVariable, setterChecked);
+                var readInterface = readInterface(beanType, typeVariable, getterChecked);
 
                 if (rwUsed && !readWriteTypeName.equals(typeName)) {
                     var extendsReadType = readTypeName.equals(typeName);
@@ -892,8 +897,29 @@ public class JavaPoetUtils {
         return builder;
     }
 
-    private static ParameterizedTypeName writeInterface(TypeName beanType, TypeVariableName typeVariable) {
-        return ParameterizedTypeName.get(ClassName.get(Write.class), beanType, typeVariable);
+    public static ParameterizedTypeName writeInterface(
+            TypeName beanType, TypeVariableName typeVariable, Class<? extends Throwable> setterChecked
+    ) {
+        return setterChecked != null
+                ? ParameterizedTypeName.get(ClassName.get(CheckedWrite.class), beanType, typeVariable, ClassName.get(setterChecked))
+                : ParameterizedTypeName.get(ClassName.get(Write.class), beanType, typeVariable);
+    }
+
+    public static ParameterizedTypeName readInterface(
+            ClassName beanType, TypeVariableName typeVariable, Class<? extends Throwable> getterChecked
+    ) {
+        return getterChecked != null
+                ? ParameterizedTypeName.get(ClassName.get(CheckedRead.class), beanType, typeVariable, ClassName.get(getterChecked))
+                : ParameterizedTypeName.get(ClassName.get(Read.class), beanType, typeVariable);
+    }
+
+    public static ParameterizedTypeName readWriteInterface(ClassName beanType, TypeVariableName typeVariable,
+                                                           Class<? extends Throwable> getterChecked,
+                                                           Class<? extends Throwable> setterChecked) {
+        return getterChecked != null && setterChecked != null
+                ? ParameterizedTypeName.get(ClassName.get(CheckedReadWrite.class), beanType, typeVariable,
+                ClassName.get(getterChecked), ClassName.get(setterChecked))
+                : ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable);
     }
 
     private static TypeSpec newBuilderType(MetaBean.BeanBuilder builderInfo) {
@@ -955,7 +981,7 @@ public class JavaPoetUtils {
 
         addValues(builder, className, setterNames, 1, uniqueNames);
 
-        builder.addSuperinterface(writeInterface(beanType, typeVariable));
+        builder.addSuperinterface(writeInterface(beanType, typeVariable, setterChecked));
         return builder.build();
     }
 

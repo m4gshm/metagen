@@ -1,6 +1,7 @@
-package meta;
+package meta.util;
 
-import meta.Module.DestinationPackage;
+import meta.Meta;
+import meta.Module;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -16,9 +17,9 @@ import java.util.Set;
 
 import static java.util.stream.Stream.ofNullable;
 import static javax.lang.model.SourceVersion.RELEASE_17;
-import static meta.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
+import static meta.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 import static meta.Module.DestinationPackage.ModuleNameBased;
-import static meta.WriteClassFileUtils.writeFiles;
+import static meta.util.WriteClassFileUtils.writeFiles;
 
 @SupportedAnnotationTypes("meta.Module")
 @SupportedSourceVersion(RELEASE_17)

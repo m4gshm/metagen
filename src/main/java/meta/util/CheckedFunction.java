@@ -1,4 +1,4 @@
-package meta;
+package meta.util;
 
 @FunctionalInterface
 public interface CheckedFunction<T, R, E extends Throwable> {

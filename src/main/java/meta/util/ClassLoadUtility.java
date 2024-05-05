@@ -1,4 +1,4 @@
-package meta;
+package meta.util;
 
 import lombok.experimental.UtilityClass;
 
