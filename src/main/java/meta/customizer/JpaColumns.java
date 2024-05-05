@@ -9,12 +9,11 @@ import io.jbock.javapoet.TypeSpec;
 import io.jbock.javapoet.TypeVariableName;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import meta.MetaCustomizer;
 import meta.util.ClassLoadUtility;
 import meta.util.MetaBean;
 import meta.util.MetaBean.BeanBuilder;
 import meta.util.MetaBean.BeanBuilder.Setter;
-import meta.MetaCustomizer;
-import meta.util.ReadWrite;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
@@ -67,6 +66,7 @@ import static meta.util.JavaPoetUtils.newInstanceCall;
 import static meta.util.JavaPoetUtils.populateConstructor;
 import static meta.util.JavaPoetUtils.populateTypeAwareClass;
 import static meta.util.JavaPoetUtils.readInterface;
+import static meta.util.JavaPoetUtils.readWriteInterface;
 import static meta.util.JavaPoetUtils.typeAwareClass;
 import static meta.util.JavaPoetUtils.typeClassOf;
 import static meta.util.JavaPoetUtils.unboxedTypeVarName;
@@ -276,7 +276,9 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         return builder.toString();
     }
 
-    private static List<Column> getColumns(Messager messager, MetaBean bean, Map<String, String> columnOverrides, BeanBuilder builderInfo) {
+    private static List<Column> getColumns(
+            Messager messager, MetaBean bean, Map<String, String> columnOverrides, BeanBuilder builderInfo
+    ) {
         var builderSetters = builderInfo != null ? builderInfo.getSetters() : List.<Setter>of();
         var setters = builderInfo != null
                 ? builderSetters.stream().collect(toMap(Setter::getName, s -> s))
@@ -364,7 +366,8 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         var beanType = bean.getType();
         var beanClass = ClassName.get(beanType);
         var beanAnnotations = getAnnotationElements(beanType.getAnnotationMirrors());
-        if (this.checkForEntityAnnotation && getJpaAnnotation(beanAnnotations, "javax.persistence.Entity", "jakarta.persistence.Entity") != null) {
+        if (this.checkForEntityAnnotation && getJpaAnnotation(beanAnnotations,
+                "javax.persistence.Entity", "jakarta.persistence.Entity") != null) {
             return out;
         }
         var className = ClassName.get("", this.className);
@@ -376,7 +379,9 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
         implementInterfaces.stream().map(iface -> ParameterizedTypeName.get(ClassName.get(iface), typeVariable))
                 .forEach(jpaColumnsClass::addSuperinterface);
 
-        var columnOverrides = getColumnOverrides(getJpaAnnotation(beanAnnotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides"));
+        var columnOverrides = getColumnOverrides(getJpaAnnotation(beanAnnotations,
+                "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides")
+        );
 
         var columnNames = new LinkedHashSet<String>();
         var builderInfo = bean.getBeanBuilderInfo();
@@ -386,8 +391,13 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             var parentColumnOverrides = new LinkedHashMap<>(columnOverrides);
             var superclass = bean.getSuperclass();
             while (superclass != null) {
-                var superclassAnnotations = getAnnotationElements(superclass.getType().getAnnotationMirrors());
-                var superclassColumnOverrides = getColumnOverrides(getJpaAnnotation(superclassAnnotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides"));
+                var superclassAnnotations = getAnnotationElements(
+                        superclass.getType().getAnnotationMirrors()
+                );
+                var superclassColumnOverrides = getColumnOverrides(getJpaAnnotation(
+                        superclassAnnotations, "javax.persistence.AttributeOverrides",
+                        "jakarta.persistence.AttributeOverrides"
+                ));
                 parentColumnOverrides.putAll(superclassColumnOverrides);
                 var superclassColumns = getColumns(messager, superclass, parentColumnOverrides, builderInfo);
                 superclass = superclass.getSuperclass();
@@ -413,7 +423,7 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
             jpaColumnsClass.addTypeVariable(builderTypeVariable);
         }
         jpaColumnsClass.addSuperinterface(allWriteable
-                ? ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanClass, typeVariable)
+                ? readWriteInterface(beanClass, typeVariable, null, null)
                 : readInterface(beanClass, typeVariable, null)
         );
 

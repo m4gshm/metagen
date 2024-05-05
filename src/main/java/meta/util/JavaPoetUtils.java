@@ -917,7 +917,8 @@ public class JavaPoetUtils {
                                                            Class<? extends Throwable> getterChecked,
                                                            Class<? extends Throwable> setterChecked) {
         return getterChecked != null && setterChecked != null
-                ? ParameterizedTypeName.get(ClassName.get(CheckedReadWrite.class), beanType, typeVariable,
+                ? ParameterizedTypeName.get(
+                ClassName.get(CheckedReadWrite.class), beanType, typeVariable,
                 ClassName.get(getterChecked), ClassName.get(setterChecked))
                 : ParameterizedTypeName.get(ClassName.get(ReadWrite.class), beanType, typeVariable);
     }
