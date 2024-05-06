@@ -546,8 +546,5 @@ public class MetaBeanExtractor {
     }
 
     record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {
-        public TypeInfo(TypeElement typeElement) {
-            this(null, typeElement);
-        }
     }
 }

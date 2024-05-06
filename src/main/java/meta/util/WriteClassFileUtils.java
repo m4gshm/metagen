@@ -73,7 +73,7 @@ public class WriteClassFileUtils {
         var sourceFile = filer.createSourceFile((pack == null || pack.isEmpty() ? "" : pack + ".") + name);
         try (
                 var out = new PrintWriter(sourceFile.openWriter());
-                var reader = javaFileObject.openReader(true)
+                var reader = javaFileObject.openReader(true);
         ) {
             reader.transferTo(out);
         }
