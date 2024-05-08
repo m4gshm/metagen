@@ -1,9 +1,7 @@
 package meta.util;
 
-import lombok.SneakyThrows;
 import meta.Meta;
 
-import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
@@ -12,25 +10,22 @@ import java.util.Objects;
 import java.util.Set;
 
 import static javax.lang.model.SourceVersion.RELEASE_17;
-import static meta.util.WriteClassFileUtils.writeFiles;
 
 /**
  * The metadata generator
  */
 @SupportedAnnotationTypes("meta.Meta")
 @SupportedSourceVersion(RELEASE_17)
-public class MetaAnnotationProcessor extends AbstractProcessor {
+public class MetaAnnotationProcessor extends FileGenerateAnnotationProcessor {
 
     @Override
-    @SneakyThrows
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         var extractor = new MetaBeanExtractor(processingEnv.getMessager());
-        var beansByPackage = roundEnv.getElementsAnnotatedWith(Meta.class).stream()
+        writeFiles(roundEnv, roundEnv.getElementsAnnotatedWith(Meta.class).stream()
                 .map(e -> e instanceof TypeElement type ? type : null)
                 .filter(Objects::nonNull)
                 .map(type -> extractor.getBean(type, null, null, type.getAnnotation(Meta.class)))
-                .filter(Objects::nonNull);
-        writeFiles(processingEnv, roundEnv.getRootElements(), beansByPackage);
+                .filter(Objects::nonNull));
         return true;
     }
 

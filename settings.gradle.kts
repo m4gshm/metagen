@@ -9,3 +9,4 @@ plugins {
 rootProject.name = "metagen"
 
 include(":test")
+include(":test-no-lombok")

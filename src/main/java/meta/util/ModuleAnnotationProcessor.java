@@ -3,7 +3,6 @@ package meta.util;
 import meta.Meta;
 import meta.Module;
 
-import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
@@ -17,19 +16,18 @@ import java.util.Set;
 
 import static java.util.stream.Stream.ofNullable;
 import static javax.lang.model.SourceVersion.RELEASE_17;
-import static meta.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 import static meta.Module.DestinationPackage.ModuleNameBased;
-import static meta.util.WriteClassFileUtils.writeFiles;
+import static meta.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 
 @SupportedAnnotationTypes("meta.Module")
 @SupportedSourceVersion(RELEASE_17)
-public class ModuleAnnotationProcessor extends AbstractProcessor {
+public class ModuleAnnotationProcessor extends FileGenerateAnnotationProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         var elements = roundEnv.getElementsAnnotatedWith(Module.class);
         var messager = this.processingEnv.getMessager();
         var extractor = new MetaBeanExtractor(messager);
-        var beansByPackage = elements.stream()
+        writeFiles(roundEnv, elements.stream()
                 .map(e -> e instanceof TypeElement type ? type : null)
                 .filter(Objects::nonNull)
                 .flatMap(type -> {
@@ -45,7 +43,7 @@ public class ModuleAnnotationProcessor extends AbstractProcessor {
                                         field.asType() instanceof DeclaredType declaredType &&
                                         declaredType.asElement() instanceof TypeElement typeElement) {
                                     var packageName = switch (destinationPackage) {
-                                        case ModuleNameBased ->  rootPackage + "." + modulePackageName;
+                                        case ModuleNameBased -> rootPackage + "." + modulePackageName;
                                         case OfModule -> rootPackage;
                                         case OfClass -> null;
                                     };
@@ -56,8 +54,7 @@ public class ModuleAnnotationProcessor extends AbstractProcessor {
                                 }
                             })
                             .filter(Objects::nonNull);
-                });
-        writeFiles(processingEnv, roundEnv.getRootElements(), beansByPackage);
+                }));
         return true;
     }
 }

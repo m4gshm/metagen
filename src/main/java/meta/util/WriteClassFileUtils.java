@@ -6,7 +6,6 @@ import io.jbock.javapoet.JavaFile;
 import io.jbock.javapoet.ParameterSpec;
 import io.jbock.javapoet.ParameterizedTypeName;
 import io.jbock.javapoet.TypeSpec;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import meta.MetaCustomizer;
 import meta.MetaModel;
@@ -16,6 +15,7 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.tools.JavaFileObject;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.List;
@@ -48,7 +48,7 @@ public class WriteClassFileUtils {
     public static void writeFiles(ProcessingEnvironment processingEnv,
                                   Collection<? extends Element> rootElements,
                                   Stream<MetaBean> beanStream) {
-        var written = writeClassFiles(processingEnv.getMessager(),
+        var written = writeFiles(processingEnv.getMessager(),
                 processingEnv.getFiler(), beanStream);
         var metamodels = written.entrySet().stream()
                 .filter(entry -> isInheritMetamodel(entry.getValue()))
@@ -68,18 +68,25 @@ public class WriteClassFileUtils {
         });
     }
 
-    @SneakyThrows
     private static void writeFile(String pack, String name, JavaFileObject javaFileObject, Filer filer) {
-        var sourceFile = filer.createSourceFile((pack == null || pack.isEmpty() ? "" : pack + ".") + name);
+        var outFilePath = (pack == null || pack.isEmpty() ? "" : pack + ".") + name;
+        JavaFileObject sourceFile;
+        try {
+            sourceFile = filer.createSourceFile(outFilePath);
+        } catch (IOException e) {
+            throw new CreateFileException(e);
+        }
         try (
                 var out = new PrintWriter(sourceFile.openWriter());
                 var reader = javaFileObject.openReader(true);
         ) {
             reader.transferTo(out);
+        } catch (IOException e) {
+            throw new WriteFileException(e);
         }
     }
 
-    private static Map<MetaBean, TypeSpec> writeClassFiles(Messager messager, Filer filer, Stream<MetaBean> beanStream) {
+    private static Map<MetaBean, TypeSpec> writeFiles(Messager messager, Filer filer, Stream<MetaBean> beanStream) {
         return beanStream.collect(toMap(bean -> bean, bean -> {
             var typeSpec = newMetaTypeBuilder(messager, bean, ofNullable(bean.getMeta()).stream()
                     .flatMap(m -> stream(m.customizers()))
@@ -126,7 +133,8 @@ public class WriteClassFileUtils {
                                 .build()
                         )
                         .build();
-                writeFile(pack, typeName, JavaFile.builder(pack, typeSpec).build().toJavaFileObject(), filer);
+                JavaFileObject javaFileObject = JavaFile.builder(pack, typeSpec).build().toJavaFileObject();
+                writeFile(pack, typeName, javaFileObject, filer);
             }
         });
     }

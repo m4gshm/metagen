@@ -3,9 +3,13 @@ package meta;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.RECORD_COMPONENT;
+import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static meta.Meta.Content.FULL;
+import static meta.Meta.Methods.Content.NONE;
 
 /**
  * Applies the metadata generator for a marked class.
@@ -26,22 +30,22 @@ public @interface Meta {
     /**
      * @return options of the properties part metadata.
      */
-    Props properties() default @Props();
+    Props properties() default @Props(FULL);
 
     /**
      * @return options of the type parameters part metadata.
      */
-    Params params() default @Params();
+    Params params() default @Params(FULL);
 
     /**
      * @return options of the class methods part metadata.
      */
-    Methods methods() default @Methods();
+    Methods methods() default @Methods(NONE);
 
     /**
      * @return options of the Lombok builder part metadata.
      */
-    Builder builder() default @Builder();
+    Builder builder() default @Builder(generateMeta = false);
 
     /**
      * Indicates that the generated metadata is included into a package level aggregator class.
@@ -91,7 +95,7 @@ public @interface Meta {
         String METHOD_NAME = "properties";
         String CLASS_NAME = "Prop";
 
-        Content value() default FULL;
+        Content value();
 
         String className() default CLASS_NAME;
 
@@ -106,29 +110,30 @@ public @interface Meta {
         String METHOD_NAME = "parameters";
         String CLASS_NAME = "Param";
 
-        Content value() default FULL;
+        Content value();
 
         String className() default CLASS_NAME;
 
         String methodName() default METHOD_NAME;
 
-        Inherited inherited() default @Inherited;
+        Inherited inherited() default @Inherited(
+                parentClass = @Inherited.Super(enumerate = true), interfaces = @Inherited.Interfaces(enumerate = true));
 
         /**
          * Options of inherited type parameters.
          */
         @Retention(SOURCE)
         @interface Inherited {
-            Super parentClass() default @Super;
+            Super parentClass();
 
-            Interfaces interfaces() default @Interfaces;
+            Interfaces interfaces();
 
             @Retention(SOURCE)
             @interface Super {
                 String METHOD_NAME = "superParameters";
                 String CLASS_NAME_SUFFIX = "Param";
 
-                boolean enumerate() default true;
+                boolean enumerate();
 
                 String classNameSuffix() default CLASS_NAME_SUFFIX;
 
@@ -140,7 +145,7 @@ public @interface Meta {
                 String METHOD_NAME = "parametersOf";
                 String CLASS_NAME_SUFFIX = "Param";
 
-                boolean enumerate() default true;
+                boolean enumerate();
 
                 String classNameSuffix() default CLASS_NAME_SUFFIX;
 
@@ -156,7 +161,7 @@ public @interface Meta {
     @interface Methods {
         String CLASS_NAME = "Method";
 
-        Content value() default Content.NONE;
+        Content value();
 
         String className() default CLASS_NAME;
 
@@ -187,7 +192,7 @@ public @interface Meta {
 
         boolean detect() default true;
 
-        boolean generateMeta() default false;
+        boolean generateMeta();
     }
 
     /**
