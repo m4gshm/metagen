@@ -18,7 +18,3 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
-
-tasks.withType<JavaCompile> {
-    this.options.compilerArgs.addAll(listOf("-Ameta.createClassFiles=true"))
-}
