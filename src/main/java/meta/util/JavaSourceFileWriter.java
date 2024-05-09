@@ -6,15 +6,14 @@ import io.jbock.javapoet.JavaFile;
 import io.jbock.javapoet.ParameterSpec;
 import io.jbock.javapoet.ParameterizedTypeName;
 import io.jbock.javapoet.TypeSpec;
-import meta.MetaCustomizer;
 import meta.MetaModel;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
-import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
@@ -23,6 +22,7 @@ import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
 import static javax.lang.model.element.Modifier.PUBLIC;
+import static meta.MetaCustomizer.instantiate;
 import static meta.util.JavaPoetUtils.generatedAnnotation;
 import static meta.util.JavaPoetUtils.initMapByEntries;
 import static meta.util.JavaPoetUtils.instanceField;
@@ -36,16 +36,15 @@ public class JavaSourceFileWriter extends AbstractFileWriter<TypeSpec> {
     }
 
     @Override
-    protected JavaFileObject toJavaFileObject(String pack, TypeSpec typeSpec) {
-        return JavaFile.builder(pack, typeSpec).build().toJavaFileObject();
-    }
-
-    @Override
     protected TypeSpec newClassSpec(MetaBean bean) {
-        return newMetaTypeBuilder(processingEnv.getMessager(), bean, ofNullable(bean.getMeta()).stream()
+        var builderClass = TypeSpec.Builder.class;
+        var customizers = ofNullable(bean.getMeta())
+                .stream()
                 .flatMap(m -> stream(m.customizers()))
-                .map(MetaCustomizer::instantiate)
-                .toList()).build();
+                .map(customizerInfo -> instantiate(customizerInfo, builderClass))
+                .filter(Objects::nonNull)
+                .toList();
+        return newMetaTypeBuilder(processingEnv.getMessager(), bean, customizers).build();
     }
 
     @Override
@@ -76,11 +75,16 @@ public class JavaSourceFileWriter extends AbstractFileWriter<TypeSpec> {
     }
 
     @Override
-    protected JavaFileObject createOutputFile(String outFilePath) {
-        try {
-            return processingEnv.getFiler().createSourceFile(outFilePath);
+    protected void writeClassFile(TypeSpec classSpec, String outPackageName, String outClassName) {
+        var outFilePath = (outPackageName == null || outPackageName.isEmpty() ? "" : outPackageName + ".") + outClassName;
+        try (
+                var dest = processingEnv.getFiler().createSourceFile(outFilePath).openWriter();
+                var src = JavaFile.builder(outPackageName != null ? outPackageName : "", classSpec)
+                        .build().toJavaFileObject().openReader(true);
+        ) {
+            src.transferTo(dest);
         } catch (IOException e) {
-            throw new CreateFileException(e);
+            throw new WriteFileException(e);
         }
     }
 

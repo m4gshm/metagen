@@ -362,6 +362,11 @@ public class JpaColumns implements MetaCustomizer<TypeSpec.Builder> {
     }
 
     @Override
+    public Class<TypeSpec.Builder> builderType() {
+        return TypeSpec.Builder.class;
+    }
+
+    @Override
     public TypeSpec.Builder customize(Messager messager, MetaBean bean, TypeSpec.Builder out) {
         var beanType = bean.getType();
         var beanClass = ClassName.get(beanType);

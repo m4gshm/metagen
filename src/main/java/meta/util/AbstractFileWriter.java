@@ -5,14 +5,10 @@ import lombok.RequiredArgsConstructor;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
-import javax.tools.JavaFileObject;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Stream;
 
 import static java.util.Optional.ofNullable;
@@ -38,20 +34,14 @@ public abstract class AbstractFileWriter<T> {
     public void writeFiles(Stream<MetaBean> beanStream) {
         writeAggregateFile(beanStream.map(bean -> {
             var type = newClassSpec(bean);
-            writeFile(bean.getPackageName(), bean.getName(), type);
+            writeClassFile(type, bean.getPackageName(), getOutClassName(bean));
             return isInheritMetamodel(bean, type) ? bean : null;
         }).filter(Objects::nonNull).collect(groupingBy(MetaBean::getPackageName)));
     }
 
-    protected abstract T newClassSpec(MetaBean bean);
-
-    protected abstract T newAggregateClassSpec(String typeName, List<String> mapParts);
-
-    protected abstract boolean isInheritMetamodel(MetaBean bean, T classSpec);
-
-    protected abstract JavaFileObject createOutputFile(String outFilePath);
-
-    protected abstract JavaFileObject toJavaFileObject(String pack, T type);
+    protected String getOutClassName(MetaBean bean) {
+        return bean.getName();
+    }
 
     protected void writeAggregateFile(Map<String, List<MetaBean>> metamodels
     ) {
@@ -67,23 +57,17 @@ public abstract class AbstractFileWriter<T> {
                 ).toString()).toList();
 
                 var typeName = getAggregatorName(pack, classNamePerPack);
-                writeFile(pack, typeName, newAggregateClassSpec(typeName, mapParts));
+                writeClassFile(newAggregateClassSpec(typeName, mapParts), pack, typeName);
             }
         });
     }
 
-    protected void writeFile(String packageName, String beanName, T type) {
-        var srcFile = toJavaFileObject(packageName, type);
-        var outFilePath = (packageName == null || packageName.isEmpty() ? "" : packageName + ".") + beanName;
-        var outFile = createOutputFile(outFilePath);
-        try (
-                var out = new PrintWriter(outFile.openWriter());
-                var reader = srcFile.openReader(true);
-        ) {
-            reader.transferTo(out);
-        } catch (IOException e) {
-            throw new WriteFileException(e);
-        }
-    }
+    protected abstract T newClassSpec(MetaBean bean);
+
+    protected abstract T newAggregateClassSpec(String typeName, List<String> mapParts);
+
+    protected abstract boolean isInheritMetamodel(MetaBean bean, T classSpec);
+
+    protected abstract void writeClassFile(T classSpec, String outPackageName, String outClassName);
 
 }

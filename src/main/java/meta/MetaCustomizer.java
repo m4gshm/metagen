@@ -13,16 +13,25 @@ import static meta.util.ClassLoadUtility.load;
 
 /**
  * The metadata customizer contract.
- * See {@link meta.Meta}
+ *
+ * @param <B> class spec builder type.
+ *            See {@link meta.Meta}
  */
-public interface MetaCustomizer<T> {
+public interface MetaCustomizer<B> {
+
     @SuppressWarnings("unchecked")
-    static MetaCustomizer<?> instantiate(Meta.Extend customizerInfo) {
+    static <B> MetaCustomizer<B> instantiate(Meta.Extend customizerInfo, Class<B> builderType) {
         var customizerClass = load(customizerInfo::value);
         var optsMap = Arrays.stream(customizerInfo.opts()).collect(toMap(
                 Meta.Extend.Opt::key, Meta.Extend.Opt::value, (l, r) -> l)
         );
+        var metaCustomizer = getbMetaCustomizer(customizerClass, optsMap);
+        return builderType.isAssignableFrom(metaCustomizer.builderType()) ? (MetaCustomizer<B>) metaCustomizer : null;
+    }
 
+    private static MetaCustomizer<?> getbMetaCustomizer(
+            Class<? extends MetaCustomizer<?>> customizerClass, Map<String, String[]> optsMap
+    ) {
         try {
             return customizerClass.getDeclaredConstructor(Map.class).newInstance(optsMap);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
@@ -38,5 +47,7 @@ public interface MetaCustomizer<T> {
         }
     }
 
-    T customize(Messager messager, MetaBean bean, T out);
+    Class<B> builderType();
+
+    B customize(Messager messager, MetaBean bean, B out);
 }
