@@ -17,8 +17,8 @@ repositories {
 }
 
 dependencies {
-    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc2")
-    implementation("io.github.m4gshm:metagen:0.0.1-rc2")
+    annotationProcessor("io.github.m4gshm:metagen-processor:0.0.1-rc2")
+    implementation("io.github.m4gshm:metagen-api:0.0.1-rc2")
 }
 ```
 

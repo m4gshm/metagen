@@ -15,8 +15,10 @@ dependencies {
 
 //    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc1")
 //    implementation("io.github.m4gshm:metagen:0.0.1-rc1")
-    annotationProcessor(project(":"))
-    implementation(project(":"))
+    annotationProcessor(project(":meta-processor"))
+    annotationProcessor(project(":meta-customizer-jpa-processor"))
+    implementation(project(":meta-api"))
+    implementation(project(":meta-customizer-jpa-api"))
 
     implementation("org.hibernate.javax.persistence:hibernate-jpa-2.1-api:1.0.2.Final")
 

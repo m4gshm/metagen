@@ -2,11 +2,17 @@ package example.model;
 
 
 import example.IdAware;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import meta.Meta;
 import meta.Meta.Methods.Content;
-import meta.customizer.JpaColumns;
+import meta.jpa.JpaColumns;
 
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;
@@ -15,8 +21,8 @@ import javax.persistence.Embedded;
 
 import static lombok.AccessLevel.NONE;
 import static lombok.AccessLevel.PUBLIC;
-import static meta.customizer.JpaColumns.OPT_CLASS_NAME;
-import static meta.customizer.JpaColumns.OPT_IMPLEMENTS;
+import static meta.jpa.JpaColumns.OPT_CLASS_NAME;
+import static meta.jpa.JpaColumns.OPT_IMPLEMENTS;
 
 @Data
 @SuperBuilder

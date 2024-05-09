@@ -2,7 +2,7 @@ package example.repository;
 
 import example.model.UserEntity;
 import example.repository.UserRepositoryMeta.Method;
-import meta.Typed;
+import meta.util.Typed;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.CrudRepository;
 

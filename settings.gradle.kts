@@ -10,3 +10,7 @@ rootProject.name = "metagen"
 
 include(":test")
 include(":test-no-lombok")
+include(":meta-api")
+include(":meta-processor")
+include(":meta-customizer-jpa-processor")
+include(":meta-customizer-jpa-api")
