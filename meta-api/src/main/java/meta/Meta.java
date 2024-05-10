@@ -198,11 +198,13 @@ public @interface Meta {
     }
 
     /**
-     * Options of metadata customizer.
-     * The customizer is a class implements meta.MetaCustomizer type.
+     * Options of a metadata customizer.
      */
     @Retention(SOURCE)
     @interface Extend {
+        /**
+         * @return a customizer's interface that implementation is instantiated by the {@link java.util.ServiceLoader}.
+         */
         Class<?> value();
 
         Opt[] opts() default {};

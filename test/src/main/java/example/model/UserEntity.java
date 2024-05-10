@@ -12,7 +12,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import meta.Meta;
 import meta.Meta.Methods.Content;
-import meta.jpa.JpaColumns;
+import meta.jpa.customizer.JpaColumns;
 
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;
@@ -21,8 +21,8 @@ import javax.persistence.Embedded;
 
 import static lombok.AccessLevel.NONE;
 import static lombok.AccessLevel.PUBLIC;
-import static meta.jpa.JpaColumns.OPT_CLASS_NAME;
-import static meta.jpa.JpaColumns.OPT_IMPLEMENTS;
+import static meta.jpa.customizer.JpaColumns.OPT_CLASS_NAME;
+import static meta.jpa.customizer.JpaColumns.OPT_IMPLEMENTS;
 
 @Data
 @SuperBuilder

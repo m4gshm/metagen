@@ -2,6 +2,7 @@ plugins {
     `java-library`
     `maven-publish`
     signing
+    id("com.gradleup.nmcp")
 }
 
 dependencies {
@@ -25,7 +26,6 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     modularity.inferModulePath.set(true)
 }
-
 
 publishing {
     publications {
@@ -69,4 +69,8 @@ if (project.properties["signing.keyId"] != null) {
         val extension = extensions.getByName("publishing") as PublishingExtension
         sign(extension.publications)
     }
+}
+
+nmcp {
+    publishAllPublications {}
 }

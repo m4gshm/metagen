@@ -2,7 +2,7 @@ package example.model.dto;
 
 import lombok.Builder;
 import meta.Meta;
-import meta.jpa.JpaColumns;
+import meta.jpa.customizer.JpaColumns;
 
 import java.util.Set;
 

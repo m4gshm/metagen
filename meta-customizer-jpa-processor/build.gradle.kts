@@ -2,6 +2,7 @@ plugins {
     `java-library`
     `maven-publish`
     signing
+    id("com.gradleup.nmcp")
 }
 
 dependencies {
@@ -78,4 +79,8 @@ if (project.properties["signing.keyId"] != null) {
         val extension = extensions.getByName("publishing") as PublishingExtension
         sign(extension.publications)
     }
+}
+
+nmcp {
+    publishAllPublications {}
 }

@@ -15,7 +15,7 @@ import meta.MetaBean;
 import meta.MetaBean.BeanBuilder;
 import meta.MetaBean.BeanBuilder.Setter;
 import meta.MetaCustomizer;
-import meta.jpa.JpaColumns;
+import meta.jpa.customizer.JpaColumns;
 import meta.util.ClassLoadUtility;
 import meta.util.JavaPoetUtils;
 import meta.util.MetaBeanExtractor;
@@ -24,7 +24,6 @@ import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.ExecutableElement;
-import java.lang.annotation.Retention;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,7 +40,6 @@ import static java.lang.Boolean.TRUE;
 import static java.lang.Character.isLowerCase;
 import static java.lang.Character.isUpperCase;
 import static java.lang.Character.toUpperCase;
-import static java.lang.annotation.RetentionPolicy.SOURCE;
 import static java.util.Arrays.stream;
 import static java.util.Collections.reverse;
 import static java.util.Objects.requireNonNull;
@@ -340,13 +338,13 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
     }
 
     @Override
-    public TypeSpec.Builder customize(Messager messager, MetaBean bean, TypeSpec.Builder out) {
+    public TypeSpec.Builder customize(Messager messager, MetaBean bean, TypeSpec.Builder classBuilder) {
         var beanType = bean.getType();
         var beanClass = ClassName.get(beanType);
         var beanAnnotations = getAnnotationElements(beanType.getAnnotationMirrors());
         if (this.checkForEntityAnnotation && getJpaAnnotation(beanAnnotations,
                 "javax.persistence.Entity", "jakarta.persistence.Entity") != null) {
-            return out;
+            return classBuilder;
         }
         var className = ClassName.get("", this.className);
         var typeVariable = TypeVariableName.get("T");
@@ -485,8 +483,8 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
 
         JavaPoetUtils.addValues(jpaColumnsClass, className, columnNames, allBuildable ? 2 : 1, uniqueNames);
 
-        out.addType(jpaColumnsClass.build());
-        return out;
+        classBuilder.addType(jpaColumnsClass.build());
+        return classBuilder;
     }
 
     @Builder(toBuilder = true)

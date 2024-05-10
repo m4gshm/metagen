@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "io.github.m4gshm"
-    version = "0.0.1-rc2"
+    version = "0.0.1-rc3"
     repositories {
         mavenCentral()
     }
@@ -93,11 +93,11 @@ publishing {
             from(components["java"])
         }
     }
-    repositories {
-        maven("file://$rootDir/../m4gshm.github.io/maven2") {
-            name = "GithubMavenRepo"
-        }
-    }
+//    repositories {
+//        maven("file://$rootDir/../m4gshm.github.io/maven2") {
+//            name = "GithubMavenRepo"
+//        }
+//    }
 }
 
 if (project.properties["signing.keyId"] != null) {
@@ -108,8 +108,9 @@ if (project.properties["signing.keyId"] != null) {
 }
 
 nmcp {
-
-    publishAllProjectsProbablyBreakingProjectIsolation {
+    publishAggregation {
+        project(":meta-api")
+        project(":meta-processor")
         val ossrhUsername = project.properties["ossrhUsername"] as String?
         val ossrhPassword = project.properties["ossrhPassword"] as String?
         username.set(ossrhUsername)

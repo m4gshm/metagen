@@ -1,5 +1,7 @@
-package meta.jpa;
+package meta.jpa.customizer;
 
+
+import meta.jpa.Column;
 
 import java.lang.annotation.Retention;
 
