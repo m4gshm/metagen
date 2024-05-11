@@ -1,7 +1,9 @@
-package meta.util;
+package meta.processor;
 
 import meta.Meta;
 import meta.Module;
+import meta.util.FileGenerateAnnotationProcessor;
+import meta.util.MetaBeanExtractor;
 
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;

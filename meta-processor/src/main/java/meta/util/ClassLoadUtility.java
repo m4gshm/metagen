@@ -1,6 +1,7 @@
 package meta.util;
 
 import lombok.experimental.UtilityClass;
+import meta.processor.MetaAnnotationProcessor;
 
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;

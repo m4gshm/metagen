@@ -31,10 +31,6 @@ tasks.test {
     useJUnitPlatform()
 }
 
-tasks.compileJava {
-//    options.isVerbose = true
-}
-
 java {
     withSourcesJar()
     withJavadocJar()

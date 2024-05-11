@@ -10,8 +10,10 @@ import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.PackageElement;
+import javax.lang.model.element.RecordComponentElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
@@ -35,6 +37,7 @@ import static java.beans.Introspector.decapitalize;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
+import static javax.lang.model.element.ElementKind.RECORD;
 import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
@@ -139,7 +142,8 @@ public class MetaBeanExtractor {
     }
 
     static boolean isJavaLang(TypeElement type) {
-        return type.getEnclosingElement().toString().startsWith("java.lang");
+        var name = type.getQualifiedName().toString();
+        return name.startsWith("java.lang");
     }
 
     static TypeMirror evalType(TypeMirror type) {
@@ -383,27 +387,24 @@ public class MetaBeanExtractor {
         var metaBean = new MetaBean(type);
         touched.put(type, metaBean);
 
-        var isRecord = false;
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
         var methods = new LinkedHashMap<String, ExecutableElement>();
         var nestedTypes = new ArrayList<TypeElement>();
-        var recordComponents = type.getRecordComponents();
-        if (recordComponents != null) {
-            isRecord = !recordComponents.isEmpty();
-            for (var recordComponent : recordComponents) {
-                var recordName = recordComponent.getSimpleName();
-                var propType = recordComponent.asType();
-                var annotationMirrors = recordComponent.getAnnotationMirrors();
-                var property = getProperty(properties, recordName.toString());
-                if (recordComponent.getAnnotation(Meta.Exclude.class) != null) {
-                    property.setExcluded(true);
-                }
-                property.setRecordComponent(recordComponent);
-                var accessor = recordComponent.getAccessor();
-                methods.put(getMethodName(accessor), accessor);
-                updateType(property, propType, typeParameters, packageName, annotationMirrors, meta, touched);
+        var isRecord = type.getKind() == RECORD;
+        var recordComponents = isRecord ?  type.getRecordComponents(): List.<RecordComponentElement>of();
+        for (var recordComponent : recordComponents) {
+            var recordName = recordComponent.getSimpleName();
+            var propType = recordComponent.asType();
+            var annotationMirrors = recordComponent.getAnnotationMirrors();
+            var property = getProperty(properties, recordName.toString());
+            if (recordComponent.getAnnotation(Meta.Exclude.class) != null) {
+                property.setExcluded(true);
             }
+            property.setRecordComponent(recordComponent);
+            var accessor = recordComponent.getAccessor();
+            methods.put(getMethodName(accessor), accessor);
+            updateType(property, propType, typeParameters, packageName, annotationMirrors, meta, touched);
         }
         var enclosedElements = type.getEnclosedElements();
         for (var enclosedElement : enclosedElements) {
