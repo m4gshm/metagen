@@ -5,14 +5,13 @@ import org.mockito.Mockito;
 
 import java.sql.Statement;
 
-import static example.modules.commons.StatementMeta.Prop.largeMaxRows;
+import static example.modules.jdbcmodule.StatementMeta.Prop.largeMaxRows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-public class StatementTest {
+public class JdbcModuleTest {
 
     @Test
     public void largeMaxRows() throws Exception {
