@@ -2,33 +2,21 @@ plugins {
     `java-library`
     `maven-publish`
     signing
-    id("com.gradleup.nmcp").version("0.0.7")
-    id("org.asciidoctor.jvm.convert") version "4.0.1"
-}
-
-allprojects {
-    group = "io.github.m4gshm"
-    version = "0.0.1-rc3"
-    repositories {
-        mavenCentral()
-    }
+    id("com.gradleup.nmcp")
 }
 
 dependencies {
     compileOnly("org.projectlombok:lombok:1.18.30")
     annotationProcessor("org.projectlombok:lombok:1.18.30")
-
-    testCompileOnly("org.projectlombok:lombok:1.18.30")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.30")
-
-    implementation("io.github.jbock-java:javapoet:1.15")
-
-    testImplementation(platform("org.junit:junit-bom:5.9.1"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
+    api(project(":meta-api"))
 }
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.compileJava {
+//    options.isVerbose = true
 }
 
 java {
@@ -37,26 +25,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
     sourceCompatibility = JavaVersion.VERSION_17
     modularity.inferModulePath.set(true)
-}
-
-tasks.asciidoctor {
-    dependsOn(":test:classes")
-    baseDirFollowsSourceFile()
-    outputOptions {
-        backends("docbook")
-    }
-}
-
-tasks.create<Exec>("pandoc") {
-    dependsOn("asciidoctor")
-    group = "documentation"
-    commandLine = "pandoc -f docbook -t gfm $buildDir/docs/asciidoc/readme.xml -o $rootDir/README.md".split(" ")
-}
-
-tasks.build {
-    if (properties["no-pandoc"] == null) {
-        dependsOn("pandoc")
-    }
 }
 
 publishing {
@@ -89,11 +57,11 @@ publishing {
             from(components["java"])
         }
     }
-//    repositories {
-//        maven("file://$rootDir/../m4gshm.github.io/maven2") {
-//            name = "GithubMavenRepo"
-//        }
-//    }
+    repositories {
+        maven("file://$rootDir/../m4gshm.github.io/maven2") {
+            name = "GithubMavenRepo"
+        }
+    }
 }
 
 if (project.properties["signing.keyId"] != null) {
@@ -104,15 +72,5 @@ if (project.properties["signing.keyId"] != null) {
 }
 
 nmcp {
-    publishAggregation {
-        project(":meta-api")
-        project(":meta-processor")
-        project(":meta-customizer-jpa-api")
-        project(":meta-customizer-jpa-processor")
-        val ossrhUsername = project.properties["ossrhUsername"] as String?
-        val ossrhPassword = project.properties["ossrhPassword"] as String?
-        username.set(ossrhUsername)
-        password.set(ossrhPassword)
-        publicationType = "USER_MANAGED"
-    }
+    publishAllPublications {}
 }
