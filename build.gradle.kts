@@ -107,6 +107,8 @@ nmcp {
     publishAggregation {
         project(":meta-api")
         project(":meta-processor")
+        project(":meta-customizer-jpa-api")
+        project(":meta-customizer-jpa-processor")
         val ossrhUsername = project.properties["ossrhUsername"] as String?
         val ossrhPassword = project.properties["ossrhPassword"] as String?
         username.set(ossrhUsername)
