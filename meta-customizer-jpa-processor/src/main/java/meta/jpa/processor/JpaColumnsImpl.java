@@ -10,12 +10,14 @@ import io.jbock.javapoet.TypeSpec;
 import io.jbock.javapoet.TypeVariableName;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.java.Log;
 import meta.Meta;
 import meta.MetaBean;
 import meta.MetaBean.BeanBuilder;
 import meta.MetaBean.BeanBuilder.Setter;
 import meta.MetaCustomizer;
 import meta.jpa.customizer.JpaColumns;
+import meta.jpa.customizer.JpaColumns.GeneratedColumnNamePostProcess.PostProcessors;
 import meta.util.ClassLoadUtility;
 import meta.util.JavaPoetUtils;
 import meta.util.MetaBeanExtractor;
@@ -24,6 +26,7 @@ import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.ExecutableElement;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -39,7 +42,6 @@ import java.util.stream.Stream;
 import static java.lang.Boolean.TRUE;
 import static java.lang.Character.isLowerCase;
 import static java.lang.Character.isUpperCase;
-import static java.lang.Character.toUpperCase;
 import static java.util.Arrays.stream;
 import static java.util.Collections.reverse;
 import static java.util.Objects.requireNonNull;
@@ -54,9 +56,11 @@ import static javax.tools.Diagnostic.Kind.OTHER;
  * Generates JPA based metadata like column name, primary key, embedded types.
  * Provides limited support of @Column @Id, @Transient, @Embedded, @EmbeddedId, @AttributeOverrides annotations.
  */
+@Log
 @RequiredArgsConstructor
 public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Builder> {
     private String className;
+    private GeneratedColumnNamePostProcess columnNamePostProcess;
     private boolean withSuperclassColumns;
     private boolean checkForEntityAnnotation;
     private List<Class> implementInterfaces;
@@ -223,14 +227,50 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
             if (i > 0 && i < chars.length - 1 && isLowerCase(chars[i - 1]) && isUpperCase(current) && isLowerCase(chars[i + 1])) {
                 builder.append('_');
             }
-            builder.append(toUpperCase(current));
+            builder.append(current);
         }
 
         return builder.toString();
     }
 
-    private static List<Column> getColumns(
-            Messager messager, MetaBean bean, Map<String, String> columnOverrides, BeanBuilder builderInfo
+    private static Map<String, Object> getJpaAnnotation(Map<String, Map<String, Object>> annotations, String javax, String jakarta) {
+        return ofNullable(annotations.get(javax)).orElse(annotations.get(jakarta));
+    }
+
+    private static boolean isExcluded(MetaBean.Property property) {
+        return property.isExcluded() || property.getAnnotation(JpaColumnsImpl.Exclude.class) != null;
+    }
+
+    private static GeneratedColumnNamePostProcess getColumnNamePostProcess(Map<String, String[]> optsMap) {
+        var name = optsMap.getOrDefault(OPT_GENERATED_COLUMN_NAME_POST_PROCESS, DEFAULT_OPT_GENERATED_COLUMN_NAME_POST_PROCESS)[0];
+        return Stream.of(PostProcessors.values()).filter(p -> {
+            return p.name().equals(name);
+        }).map(p -> (GeneratedColumnNamePostProcess) p).findFirst().orElseGet(() -> {
+            Class<?> aClass;
+            try {
+                aClass = Class.forName(name);
+            } catch (ClassNotFoundException e) {
+                log.info("ColumnNamePostProcess class not found: " + name);
+                aClass = null;
+            }
+            if (aClass != null) try {
+                Object instance = aClass.getDeclaredConstructor().newInstance();
+                if (instance instanceof GeneratedColumnNamePostProcess columnNamePostProcess2) {
+                    return columnNamePostProcess2;
+                } else {
+                    log.info("Unmatched to ColumnNamePostProcess type: " + name);
+                }
+            } catch (NoSuchMethodException e) {
+                log.info("Class doesn't have no-args public constructor: " + name);
+            } catch (InvocationTargetException | IllegalAccessException | InstantiationException e) {
+                log.info("ColumnNamePostProcess instantiate error: " + name + ",  error: " + e.getMessage());
+            }
+            return PostProcessors.noop;
+        });
+    }
+
+    private List<Column> getColumns(Messager messager, MetaBean bean, Map<String, String> columnOverrides,
+                                    BeanBuilder builderInfo
     ) {
         var builderSetters = builderInfo != null ? builderInfo.getSetters() : List.<Setter>of();
         var setters = builderInfo != null
@@ -254,33 +294,23 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
             if (_transient != null) {
                 return Stream.empty();
             } else if (embedded != null || embeddedId != null) {
-                var embeddedColumns = getEmbeddedColumns(messager, property, getColumnOverrides(
-                        getJpaAnnotation(annotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides")
-                ));
+                var embeddedColumns = getEmbeddedColumns(messager, property, getColumnOverrides(getJpaAnnotation(
+                        annotations, "javax.persistence.AttributeOverrides", "jakarta.persistence.AttributeOverrides"
+                )));
                 return embeddedId == null ? embeddedColumns.stream()
                         : embeddedColumns.stream().map(c -> c.toBuilder().pk(true).build());
             } else {
-                return Stream.of(newColumn(
-                        getJpaAnnotation(annotations, "javax.persistence.Id", "jakarta.persistence.Id") != null,
-                        property, builderInfo, possibleBuilderSetter,
-                        getJpaAnnotation(annotations, "javax.persistence.Column", "jakarta.persistence.Column"),
-                        columnOverrides));
+                var pk = getJpaAnnotation(annotations, "javax.persistence.Id", "jakarta.persistence.Id") != null;
+                var columnAttributes = getJpaAnnotation(annotations, "javax.persistence.Column", "jakarta.persistence.Column");
+                return Stream.of(newColumn(pk, property, builderInfo, possibleBuilderSetter, columnAttributes, columnOverrides));
             }
         }).toList();
     }
 
-    private static Map<String, Object> getJpaAnnotation(Map<String, Map<String, Object>> annotations, String javax, String jakarta) {
-        return ofNullable(annotations.get(javax)).orElse(annotations.get(jakarta));
-    }
-
-    private static boolean isExcluded(MetaBean.Property property) {
-        return property.isExcluded() || property.getAnnotation(JpaColumnsImpl.Exclude.class) != null;
-    }
-
-    private static Column newColumn(boolean pk, MetaBean.Property property,
-                                    BeanBuilder builder, Setter setter,
-                                    Map<String, Object> columnAttributes,
-                                    Map<String, String> columnOverrides) {
+    private Column newColumn(boolean pk, MetaBean.Property property,
+                             BeanBuilder builder, Setter setter,
+                             Map<String, Object> columnAttributes,
+                             Map<String, String> columnOverrides) {
         return Column.builder()
                 .pk(pk).setter(setter).beanBuilder(builder)
                 .name(getColumnName(property.getName(), columnAttributes, columnOverrides))
@@ -288,19 +318,22 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
                 .build();
     }
 
-    private static String getColumnName(String propertyName,
-                                        Map<String, Object> columnAttributes,
-                                        Map<String, String> columnOverrides) {
+    private String getColumnName(String propertyName,
+                                 Map<String, Object> columnAttributes,
+                                 Map<String, String> columnOverrides) {
         return ofNullable(columnAttributes).map(c -> c.get("name"))
                 .map(Object::toString)
                 .or(() -> ofNullable(columnOverrides).map(m -> m.get(propertyName)))
-                .orElseGet(() -> toColumnName(propertyName));
+                .orElseGet(() -> {
+                    return this.columnNamePostProcess.apply(toColumnName(propertyName));
+                });
     }
 
-    private static List<Column> getEmbeddedColumns(
+    private List<Column> getEmbeddedColumns(
             Messager messager, MetaBean.Property property, Map<String, String> columnOverrides
     ) {
-        return ofNullable(property.getBean()).map(embeddedBean -> getColumns(messager, embeddedBean, columnOverrides, embeddedBean.getBeanBuilderInfo())
+        return ofNullable(property.getBean()).map(embeddedBean -> getColumns(messager, embeddedBean,
+                columnOverrides, embeddedBean.getBeanBuilderInfo())
                 .stream().map(embeddedColumn -> {
                     var oldPath = embeddedColumn.path();
                     var newPath = new ArrayList<MetaBean.Property>();
@@ -314,11 +347,11 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
                 property.getName() + "', type '" + property.getType() + "'"));
     }
 
-
     @Override
     public void init(Meta.Extend.Opt... opts) {
         var optsMap = Arrays.stream(opts).collect(toMap(Meta.Extend.Opt::key, Meta.Extend.Opt::value, (l, r) -> l));
         this.className = optsMap.getOrDefault(OPT_CLASS_NAME, DEFAULT_CLASS_NAME)[0];
+        this.columnNamePostProcess = getColumnNamePostProcess(optsMap);
         this.withSuperclassColumns = optsMap.getOrDefault(
                 OPT_WITH_SUPERCLASS_COLUMNS, DEFAULT_WITH_SUPERCLASS_COLUMNS
         )[0].equals(TRUE.toString());
@@ -330,7 +363,6 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
                 .map(fullClassName -> (Class) ClassLoadUtility.load(fullClassName)).toList();
         this.implementInterfaces = impls.isEmpty() ? stream(DEFAULT_IMPLEMENTS).toList() : impls;
     }
-
 
     @Override
     public Class<TypeSpec.Builder> builderType() {
