@@ -6,11 +6,11 @@ plugins {
 }
 
 dependencies {
-    compileOnly("org.projectlombok:lombok:1.18.32")
-    annotationProcessor("org.projectlombok:lombok:1.18.32")
+    compileOnly("org.projectlombok:lombok:1.18.38")
+    annotationProcessor("org.projectlombok:lombok:1.18.38")
 
-    testCompileOnly("org.projectlombok:lombok:1.18.32")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.32")
+    testCompileOnly("org.projectlombok:lombok:1.18.38")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
 
     api(project(":meta-customizer-jpa-api"))
     api(project(":meta-processor"))

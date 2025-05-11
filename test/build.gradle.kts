@@ -7,11 +7,11 @@ repositories {
 }
 
 dependencies {
-    compileOnly("org.projectlombok:lombok:1.18.32")
-    annotationProcessor("org.projectlombok:lombok:1.18.32")
+    compileOnly("org.projectlombok:lombok:1.18.38")
+    annotationProcessor("org.projectlombok:lombok:1.18.38")
 
-    testCompileOnly("org.projectlombok:lombok:1.18.32")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.32")
+    testCompileOnly("org.projectlombok:lombok:1.18.38")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
 
 //    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc1")
 //    implementation("io.github.m4gshm:metagen:0.0.1-rc1")
@@ -26,7 +26,7 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.17.0")
 }
 
 tasks.test {
