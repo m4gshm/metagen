@@ -35,6 +35,7 @@ publishing {
                 url.set("https://github.com/m4gshm/metagen")
                 properties.put("maven.compiler.target", "${java.targetCompatibility}")
                 properties.put("maven.compiler.source", "${java.sourceCompatibility}")
+                name.set(project.name)
                 developers {
                     developer {
                         id.set("m4gshm")
