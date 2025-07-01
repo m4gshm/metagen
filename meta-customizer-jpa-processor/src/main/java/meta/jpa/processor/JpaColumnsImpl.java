@@ -1,13 +1,6 @@
 package meta.jpa.processor;
 
-import io.jbock.javapoet.ClassName;
-import io.jbock.javapoet.CodeBlock;
-import io.jbock.javapoet.FieldSpec;
-import io.jbock.javapoet.MethodSpec;
-import io.jbock.javapoet.ParameterizedTypeName;
-import io.jbock.javapoet.TypeName;
-import io.jbock.javapoet.TypeSpec;
-import io.jbock.javapoet.TypeVariableName;
+import io.jbock.javapoet.*;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
@@ -27,16 +20,7 @@ import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.ExecutableElement;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.lang.Boolean.TRUE;
@@ -47,9 +31,7 @@ import static java.util.Collections.reverse;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PUBLIC;
-import static javax.lang.model.element.Modifier.STATIC;
+import static javax.lang.model.element.Modifier.*;
 import static javax.tools.Diagnostic.Kind.OTHER;
 
 /**
@@ -104,13 +86,12 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
         }).filter(Objects::nonNull).collect(toMap(Map.Entry::getKey, Map.Entry::getValue)) : Map.of();
     }
 
-    private static String addColumnConst(Column column, ClassName className, TypeSpec.Builder jpaColumnsClass,
-                                         boolean addSetter, boolean allBuildable) {
+    private static String addColumnConstToClassBuilder(TypeSpec.Builder jpaColumnsClass,
+                                                       Column column, ClassName className,
+                                                       boolean addSetter, boolean allBuildable) {
         final CodeBlock getterArgCode, setterArgCode;
         var type = TypeName.get(column.property().getEvaluatedType());
-        var beanBuilder = column.beanBuilder();
-        var builderType = beanBuilder != null ? beanBuilder.getType() : null;
-        var parametrizedBuilderType = beanBuilder != null ? JavaPoetUtils.wildcardParametrized(beanBuilder.getType()) : null;
+        var parametrizedBuilderType = getParametrizedBuilderType(column.beanBuilder());
 
         var path = column.path();
         var straightPath = new ArrayList<>(path);
@@ -179,40 +160,50 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
             setterArgCode = JavaPoetUtils.getSetterCallCode(beanParamName, valueParamName, publicField, field, record, property.getSetter());
         }
 
-        var fieldType = allBuildable
+        var fieldType = /*allBuildable
                 ? ParameterizedTypeName.get(className, JavaPoetUtils.unboxedTypeVarName(type), parametrizedBuilderType)
-                : ParameterizedTypeName.get(className, JavaPoetUtils.unboxedTypeVarName(type));
+                : */ParameterizedTypeName.get(className, JavaPoetUtils.unboxedTypeVarName(type));
 
         var name = column.name();
         var strPath = straightPath.stream().map(MetaBean.Property::getName).reduce((l, r) -> l + "." + r).orElse("");
         var uniqueNames = new HashSet<String>();
 
-        var builderParamName = JavaPoetUtils.getUniqueName("builder", uniqueNames);
-        var valueParamName = JavaPoetUtils.getUniqueName("value", uniqueNames);
-
         var constructorArgs = JavaPoetUtils.enumConstructorArgs(name, JavaPoetUtils.dotClass(type), getterArgCode, addSetter ? setterArgCode : null);
         if (allBuildable) {
-            constructorArgs.add(", $L", JavaPoetUtils.dotClass(ClassName.get(builderType)));
+            var builderParamName = JavaPoetUtils.getUniqueName("builder", uniqueNames);
+            var valueParamName = JavaPoetUtils.getUniqueName("value", uniqueNames);
 
-            var setter = column.setter();
-            var builderSetter = JavaPoetUtils.getSetterCallCode(
-                    builderParamName, valueParamName, false, null, null, setter.getSetter()
-            );
-            constructorArgs.add(", ").add(builderSetter);
+
+            if (parametrizedBuilderType != null) {
+                constructorArgs.add(", $L", JavaPoetUtils.dotClass(parametrizedBuilderType));
+
+                var setter = column.setter();
+                var builderSetter = JavaPoetUtils.getSetterCallCode(
+                        builderParamName, valueParamName, false, null, null, setter.getSetter()
+                );
+                constructorArgs.add(", ").add(builderSetter);
+            }
         }
 
         var enumConstructorArgs = CodeBlock.builder().add(" " + column.pk() + ", ").add("\"" + strPath + "\", ").add(
                 constructorArgs.build()
         ).build();
 
-        jpaColumnsClass.addField(FieldSpec.builder(fieldType, name, PUBLIC, STATIC, FINAL)
-                .initializer(allBuildable
+        var columnField = FieldSpec.builder(fieldType, name, PUBLIC, STATIC, FINAL)
+                .initializer(/*allBuildable
                         ? JavaPoetUtils.newInstanceCall(className, JavaPoetUtils.unboxedTypeVarName(type), parametrizedBuilderType, enumConstructorArgs)
-                        : JavaPoetUtils.newInstanceCall(className, JavaPoetUtils.unboxedTypeVarName(type), enumConstructorArgs)
+                        : */JavaPoetUtils.newInstanceCall(className, JavaPoetUtils.unboxedTypeVarName(type), enumConstructorArgs)
                 )
-                .build());
+                .build();
+        jpaColumnsClass.addField(columnField);
 
-        return name;
+        return columnField.name;
+    }
+
+    private static TypeName getParametrizedBuilderType(BeanBuilder beanBuilder) {
+        var builderType = ofNullable(beanBuilder).map(BeanBuilder::getType);
+        var parametrizedBuilderType = builderType.map(JavaPoetUtils::wildcardParametrized).orElse(null);
+        return parametrizedBuilderType;
     }
 
     private static String toColumnName(String name) {
@@ -380,7 +371,6 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
         }
         var className = ClassName.get("", this.className);
         var typeVariable = TypeVariableName.get("T");
-        var builderTypeVariable = TypeVariableName.get("B");
 
         var jpaColumnsClass = JavaPoetUtils.typeAwareClass(className, typeVariable).addModifiers(FINAL);
 
@@ -427,16 +417,13 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
 
         allBuildable &= !allWriteable;
 
-        if (allBuildable) {
-            jpaColumnsClass.addTypeVariable(builderTypeVariable);
-        }
         jpaColumnsClass.addSuperinterface(allWriteable
                 ? JavaPoetUtils.readWriteInterface(beanClass, typeVariable, null, null)
                 : JavaPoetUtils.readInterface(beanClass, typeVariable, null)
         );
 
         for (var column : columns) {
-            columnNames.add(addColumnConst(column, className, jpaColumnsClass, allWriteable, allBuildable));
+            columnNames.add(addColumnConstToClassBuilder(jpaColumnsClass, column, className, allWriteable, allBuildable));
         }
 
         var uniqueNames = new HashSet<>(columnNames);
@@ -461,8 +448,8 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
 
         var getterType = JavaPoetUtils.getFunctionType(beanClass, typeVariable, null);
         var setterType = JavaPoetUtils.getBiConsumerType(beanClass, typeVariable, null);
-        var builderType = builderTypeVariable;
-        var builderSetterType = JavaPoetUtils.getBiConsumerType(builderTypeVariable, typeVariable, null);
+        var builderType = getParametrizedBuilderType(builderInfo);
+        var builderSetterType = JavaPoetUtils.getBiConsumerType(builderType, typeVariable, null);
 
         constructor
                 .addParameter(pkArgType, "pk")
@@ -510,10 +497,10 @@ public class JpaColumnsImpl implements JpaColumns, MetaCustomizer<TypeSpec.Build
                             .addStatement("return " + builderTypeFieldName)
                             .build());
             jpaColumnsClass.addMethod(typeGetter.build());
-            JavaPoetUtils.addSetter(jpaColumnsClass, builderTypeVariable, typeVariable, builderSetterType, builderSetterFieldName, "apply", "builder", false, null);
+            JavaPoetUtils.addSetter(jpaColumnsClass, builderType, typeVariable, builderSetterType, builderSetterFieldName, "apply", "builder", false, null);
         }
 
-        JavaPoetUtils.addValues(jpaColumnsClass, className, columnNames, allBuildable ? 2 : 1, uniqueNames);
+        JavaPoetUtils.addValues(jpaColumnsClass, className, columnNames, /*allBuildable ? 2 : */1, uniqueNames);
 
         classBuilder.addType(jpaColumnsClass.build());
         return classBuilder;
