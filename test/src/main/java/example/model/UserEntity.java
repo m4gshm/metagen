@@ -75,16 +75,6 @@ public class UserEntity extends Entity<Long> implements IdAware<Long> {
     @Builder(access = PUBLIC, toBuilder = true)
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class LegalAddress {
-        private String postalCode;
-        private String city;
-        private String street;
-    }
-
-    @Data
-    @Builder(access = PUBLIC, toBuilder = true)
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class Tag {
         private String tagValue;
     }

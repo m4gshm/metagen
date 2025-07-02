@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "io.github.m4gshm"
-    version = "0.0.1-rc5"
+    version = "0.0.1-rc6"
     repositories {
         mavenCentral()
     }

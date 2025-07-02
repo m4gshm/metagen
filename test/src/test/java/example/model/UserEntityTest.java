@@ -1,8 +1,5 @@
-package example;
+package example.model;
 
-import example.model.UserEntity;
-import example.model.UserEntityAddressMeta;
-import example.model.UserEntityMeta;
 import example.model.UserEntityMeta.BuilderMeta;
 import example.model.UserEntityMeta.Column;
 import lombok.SneakyThrows;
@@ -10,10 +7,13 @@ import meta.Meta;
 import meta.util.SuperParametersAware;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.Set;
 
 import static example.model.UserEntityMeta.Prop.*;
 import static example.model._Model.instance;
+import static java.util.stream.Collectors.toSet;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class UserEntityTest {
@@ -107,11 +107,6 @@ public class UserEntityTest {
                 .legalAddress(UserEntity.Address.builder()
                         .street("Centr. st")
                         .build())
-//                .tags(new UserEntity.Tag[]{
-//                        UserEntity.Tag.builder()
-//                                .tagValue("tag")
-//                                .build()
-//                })
                 .build();
 
         var dest = UserEntity.builder().build();
@@ -126,6 +121,7 @@ public class UserEntityTest {
         var noTags = Column.values().stream().anyMatch(c -> c.name().equals("TAGS"));
         assertFalse(noTags);
         assertEquals(src, dest);
+
     }
 
     @Test
@@ -133,5 +129,14 @@ public class UserEntityTest {
         var values = UserEntityMeta.Method.values();
         assertEquals(13, values.size());
     }
+
+    @Test
+    public void testAccessFields() {
+        var fields = Arrays.stream(UserEntityMeta.Column.class.getDeclaredFields()).map(Field::getName).collect(toSet());
+        assertTrue(fields.contains("getter"));
+        assertTrue(fields.contains("setter"));
+        assertFalse(fields.contains("builderSetter"));
+    }
+
 }
 

@@ -806,6 +806,10 @@ public class JavaPoetUtils {
             TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar,
             ParameterizedTypeName getterType, String getterFieldName,
             Class<? extends Throwable> getterChecked) {
+        builder.addMethod(newGetter(builder, beanType, propertyTypeVar, getterType, getterFieldName, getterChecked));
+    }
+
+    private static MethodSpec newGetter(TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar, ParameterizedTypeName getterType, String getterFieldName, Class<? extends Throwable> getterChecked) {
         builder.addField(FieldSpec.builder(getterType, getterFieldName).addModifiers(PUBLIC, FINAL).build());
         var methodBuilder = methodBuilder("get")
                 .addAnnotation(Override.class)
@@ -816,14 +820,20 @@ public class JavaPoetUtils {
         if (getterChecked != null) {
             methodBuilder.addException(ClassName.get(getterChecked));
         }
-        builder.addMethod(methodBuilder.build());
+        return methodBuilder.build();
     }
 
     public static void addSetter(
             TypeSpec.Builder builder, TypeName beanType, TypeVariableName propertyTypeVar,
             ParameterizedTypeName setterType, String fieldName, String methodName, String argName, boolean override,
             Class<? extends Throwable> setterChecked) {
-        builder.addField(FieldSpec.builder(setterType, fieldName).addModifiers(PUBLIC, FINAL).build());
+        var result = newPropertyWritable(beanType, propertyTypeVar, setterType, fieldName, methodName, argName, override, setterChecked);
+        builder.addField(result.fieldSpec());
+        builder.addMethod(result.setter());
+    }
+
+    private static PropertyWritable newPropertyWritable(TypeName beanType, TypeVariableName propertyTypeVar, ParameterizedTypeName setterType, String fieldName, String methodName, String argName, boolean override, Class<? extends Throwable> setterChecked) {
+        var fieldSpec = builder(setterType, fieldName).addModifiers(PUBLIC, FINAL).build();
         var methodBuilder = methodBuilder(methodName)
                 .addModifiers(PUBLIC)
                 .addParameter(beanType, argName)
@@ -835,7 +845,11 @@ public class JavaPoetUtils {
         if (setterChecked != null) {
             methodBuilder.addException(ClassName.get(setterChecked));
         }
-        builder.addMethod(methodBuilder.build());
+        var setter = methodBuilder.build();
+        return new PropertyWritable(fieldSpec, setter);
+    }
+
+    private record PropertyWritable(FieldSpec fieldSpec, MethodSpec setter) {
     }
 
     public static ParameterizedTypeName getFunctionType(
