@@ -6,10 +6,12 @@ import meta.Meta;
 
 import java.util.List;
 
+import static meta.Meta.Content.FULL;
+
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@Meta(builder = @Meta.Builder(generateMeta = true))
+@Meta(properties = @Meta.Props(FULL), builder = @Meta.Builder(generateMeta = true))
 public class AnyReadableWritableBean {
 
     @Getter

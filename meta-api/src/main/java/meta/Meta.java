@@ -4,13 +4,14 @@ import meta.util.MetaModel;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.function.Function;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.RECORD_COMPONENT;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.SOURCE;
-import static meta.Meta.Content.FULL;
+import static meta.Meta.Content.NAME;
 import static meta.Meta.Methods.Content.NONE;
 
 /**
@@ -20,6 +21,7 @@ import static meta.Meta.Methods.Content.NONE;
 @Target({TYPE, FIELD})
 @Retention(SOURCE)
 public @interface Meta {
+
     String META = "Meta";
 
     /**
@@ -32,12 +34,12 @@ public @interface Meta {
     /**
      * @return options of the properties part metadata.
      */
-    Props properties() default @Props(FULL);
+    Props properties() default @Props(NAME);
 
     /**
      * @return options of the type parameters part metadata.
      */
-    Params params() default @Params(FULL);
+    Params params() default @Params(Content.NONE);
 
     /**
      * @return options of the class methods part metadata.
@@ -102,6 +104,11 @@ public @interface Meta {
         String className() default CLASS_NAME;
 
         String methodName() default METHOD_NAME;
+
+        Class<? extends Function<String, String>> nameConverter() default AsIs.class;
+
+        interface AsIs extends Function<String, String> {
+        }
     }
 
     /**

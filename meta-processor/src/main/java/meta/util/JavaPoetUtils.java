@@ -11,13 +11,14 @@ import io.jbock.javapoet.TypeName;
 import io.jbock.javapoet.TypeSpec;
 import io.jbock.javapoet.TypeVariableName;
 import io.jbock.javapoet.WildcardTypeName;
+import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import meta.Meta;
 import meta.Meta.Params;
 import meta.MetaBean;
-import meta.MetaCustomizer;
 import meta.MetaBean.Param;
 import meta.MetaBean.Property;
+import meta.MetaCustomizer;
 
 import javax.annotation.processing.Generated;
 import javax.annotation.processing.Messager;
@@ -28,6 +29,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,6 +40,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -51,6 +54,7 @@ import static io.jbock.javapoet.TypeSpec.classBuilder;
 import static io.jbock.javapoet.WildcardTypeName.subtypeOf;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
+import static java.util.function.Function.identity;
 import static java.util.stream.IntStream.range;
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PRIVATE;
@@ -72,8 +76,8 @@ public class JavaPoetUtils {
         var parameters = meta.map(Meta::params);
         var metaMethods = meta.map(Meta::methods);
 
-        var propsEnum = props.map(Meta.Props::value).orElse(FULL);
-        var paramsEnum = parameters.map(Params::value).orElse(FULL);
+        var propsEnum = props.map(Meta.Props::value).orElse(NAME);
+        var paramsEnum = parameters.map(Params::value).orElse(NONE);
         var methodsEnum = metaMethods.map(Meta.Methods::value).orElse(Meta.Methods.Content.NONE);
 
         var beanType = ClassName.get(bean.getType());
@@ -87,7 +91,7 @@ public class JavaPoetUtils {
                         .addStatement("return type")
                         .build());
 
-        var typeField = FieldSpec.builder(typeFieldType, "type", PUBLIC, FINAL)
+        var typeField = builder(typeFieldType, "type", PUBLIC, STATIC, FINAL)
                 .initializer(dotClass(beanType))
                 .build();
 
@@ -119,7 +123,7 @@ public class JavaPoetUtils {
             }
 
             var inheritedParamsFieldName = "inheritedParams";
-            var inheritedParamsField = FieldSpec.builder(
+            var inheritedParamsField = builder(
                     ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(Class.class),
                             ParameterizedTypeName.get(ClassName.get(List.class),
                                     subtypeOf(wildcardParametrized(ClassName.get(Typed.class), 1)))),
@@ -211,34 +215,13 @@ public class JavaPoetUtils {
                     ? typeAwareClass(typeName, typeVariable)
                     : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
 
-            var propertyPerName = new LinkedHashMap<String, Property>();
-            var propertyWeights = new LinkedHashMap<String, AtomicInteger>();
-
-            for (var property : bean.getPublicProperties()) {
-                if (!property.isExcluded()) {
-                    var propertyName = property.getName();
-                    if (propertyPerName.put(propertyName, property) != null) {
-                        throw new IllegalStateException("property already handled, " + propertyName);
-                    }
-                    propertyWeights.put(propertyName, new AtomicInteger(1));
-                }
-            }
-
-            var sc = superclass;
-            var superClassPropsWeight = 2;
-            while (sc != null) {
-                addProperties(sc, propertyPerName, propertyWeights, superClassPropsWeight);
-                sc = sc.getSuperclass();
-                superClassPropsWeight++;
-            }
-
-            addInterfaceProps(interfaces, propertyPerName, propertyWeights, 1);
+            var properties = BeanProperties.newBeanProperties(bean);
 
             var allReadable = true;
             var allWritable = true;
             Class<? extends Throwable> getterChecked = null;
             Class<? extends Throwable> setterChecked = null;
-            for (var property : propertyPerName.values()) {
+            for (var property : properties.names().values()) {
                 if (getterChecked == null) {
                     getterChecked = getCheckedException(property.getGetter());
                 }
@@ -266,10 +249,12 @@ public class JavaPoetUtils {
             var readUsed = false;
             var writeUsed = false;
 
-            var orderedProperties = weightOrdered(propertyWeights);
+            var orderedProperties = weightOrdered(properties.weights());
+
+            var propertyNameConverter = props.map(JavaPoetUtils::getPropertyNameConverter).orElse(identity());
 
             for (var propertyName : orderedProperties) {
-                var property = requireNonNull(propertyPerName.get(propertyName), propertyName + " is null");
+                var property = requireNonNull(properties.names().get(propertyName), propertyName + " is null");
                 var read = isReadable(property);
                 var writable = isWriteable(property);
                 var full = read && writable;
@@ -327,17 +312,8 @@ public class JavaPoetUtils {
 //                    typ = propType;
 //                }
 
-                var paramTypeName = TypeName.get(property.getEvaluatedType());
-                var fieldSpec = switch (propsEnum) {
-                    case FULL -> newPropertyConstant(typ, property.getName(),
-                            paramTypeName, property.getField(), property.isPublicField(), property.getGetter(),
-                            property.getSetter(), property.getRecordComponent());
-                    case NAME ->
-                            staticField(property.getName(), ClassName.get(String.class)).initializer("\"$L\"", property.getName());
-                    case TYPE ->
-                            staticField(property.getName(), typeClassOf(paramTypeName)).initializer(dotClass(paramTypeName));
-                    default -> null;
-                };
+                var propertyName1 = propertyNameConverter.apply(property.getName());
+                var fieldSpec = newPropertyField(propsEnum, propertyName1, property, typ);
                 if (fieldSpec != null) {
                     propsClassBuilder.addField(fieldSpec.build());
                 }
@@ -411,7 +387,7 @@ public class JavaPoetUtils {
                     propsClassBuilder.addType(subType.build());
                 }
 
-                uniqueNames.addAll(propertyPerName.keySet());
+                uniqueNames.addAll(properties.names().keySet());
 
                 var nameFieldName = getUniqueName("name", uniqueNames);
                 var typeFieldName = getUniqueName("type", uniqueNames);
@@ -452,10 +428,10 @@ public class JavaPoetUtils {
                 }
 
                 propsClassBuilder.addMethod(constructor.addCode(constructorBody.build()).build());
-                propsClassBuilder = addValues(propsClassBuilder, typeName, propertyPerName.keySet(), 1, uniqueNames);
+                propsClassBuilder = addValues(propsClassBuilder, typeName, properties.names().keySet(), 1, uniqueNames);
             } else {
-                if (!propertyPerName.isEmpty()) {
-                    propsClassBuilder = addValues(propsClassBuilder, ClassName.get(String.class), propertyPerName.keySet(), uniqueNames);
+                if (!properties.names().isEmpty()) {
+                    propsClassBuilder = addValues(propsClassBuilder, ClassName.get(String.class), properties.names().keySet(), uniqueNames);
                 }
             }
             builder.addType(propsClassBuilder.build());
@@ -566,6 +542,34 @@ public class JavaPoetUtils {
         return builder;
     }
 
+    @SneakyThrows
+    private static Function<String, String> getPropertyNameConverter(Meta.Props props) {
+        try {
+            var convClass = props.nameConverter();
+            return convClass != null ? convClass.getConstructor().newInstance() : null;
+        } catch (MirroredTypeException mte) {
+            mte.getTypeMirror().toString();
+            return null;
+        }
+    }
+
+    public static FieldSpec.Builder newPropertyField(Meta.Content content, Property property, ClassName typ) {
+        return newPropertyField(content, property.getName(), property, typ);
+    }
+
+    public static FieldSpec.Builder newPropertyField(Meta.Content content, String propertyName, Property property,
+                                                     ClassName typ) {
+        var paramTypeName = TypeName.get(property.getEvaluatedType());
+        return switch (content) {
+            case FULL -> newPropertyConstant(propertyName, typ,
+                    paramTypeName, property.getField(), property.isPublicField(), property.getGetter(),
+                    property.getSetter(), property.getRecordComponent());
+            case NAME -> staticField(propertyName, ClassName.get(String.class)).initializer("\"$L\"", propertyName);
+            case TYPE -> staticField(propertyName, typeClassOf(paramTypeName)).initializer(dotClass(paramTypeName));
+            default -> null;
+        };
+    }
+
     private static Class<? extends Throwable> getCheckedException(ExecutableElement method) {
         return (method != null ? method.getThrownTypes() : List.<TypeMirror>of()).stream()
                 .map(typeMirror -> typeMirror instanceof DeclaredType declaredType ? declaredType.asElement() : null)
@@ -593,18 +597,9 @@ public class JavaPoetUtils {
     }
 
     public static FieldSpec instanceField(String name) {
-        return FieldSpec.builder(
+        return builder(
                 ClassName.get("", name), "instance", PUBLIC, STATIC, FINAL
         ).initializer("new $L()", name).build();
-    }
-
-    private static void addProperties(MetaBean bean, Map<String, Property> propertyPerName,
-                                      Map<String, AtomicInteger> usedWeights, int weight) {
-        var properties = bean.getPublicProperties();
-        for (var property : properties) {
-            addInheritedProp(property, propertyPerName, usedWeights, weight);
-        }
-        addInterfaceProps(bean.getInterfaces(), propertyPerName, usedWeights, weight);
     }
 
     private static void addInterfaceMethods(List<MetaBean> interfaces, Set<String> methods,
@@ -636,31 +631,6 @@ public class JavaPoetUtils {
         var ordered = new ArrayList<>(weightValues.keySet());
         ordered.sort(new WeightComparator(weightValues));
         return ordered;
-    }
-
-    private static void addInterfaceProps(List<MetaBean> interfaces, Map<String, Property> propertyPerName,
-                                          Map<String, AtomicInteger> usedWeights, int weight) {
-        if (interfaces == null) {
-            return;
-        }
-        for (var iface : interfaces) {
-            var properties = iface.getPublicProperties();
-            for (var property : properties) {
-                addInheritedProp(property, propertyPerName, usedWeights, weight);
-            }
-            addInterfaceProps(iface.getInterfaces(), propertyPerName, usedWeights, weight);
-        }
-    }
-
-    private static void addInheritedProp(Property property, Map<String, Property> propertyPerName,
-                                         Map<String, AtomicInteger> usedWeights, int weight) {
-        if (!property.isExcluded()) {
-            var propertyName = property.getName();
-            if (!propertyPerName.containsKey(propertyName)) {
-                propertyPerName.put(propertyName, property);
-            }
-            usedWeights.computeIfAbsent(propertyName, k -> new AtomicInteger(weight)).incrementAndGet();
-        }
     }
 
     private static MethodSpec.Builder baseConstructor(ClassName nameArgType, ParameterizedTypeName typeArgType) {
@@ -775,7 +745,7 @@ public class JavaPoetUtils {
     }
 
     public static FieldSpec.Builder staticField(String name, TypeName type) {
-        return FieldSpec.builder(type, name, PUBLIC, FINAL, STATIC);
+        return builder(type, name, PUBLIC, FINAL, STATIC);
     }
 
     public static TypeSpec.Builder populateTypeAwareClass(TypeSpec.Builder builder,
@@ -798,7 +768,7 @@ public class JavaPoetUtils {
                 .returns(type)
                 .addStatement("return this." + fieldName);
         builder
-                .addField(FieldSpec.builder(type, fieldName).addModifiers(PUBLIC, FINAL).build())
+                .addField(builder(type, fieldName).addModifiers(PUBLIC, FINAL).build())
                 .addMethod(accessor.build());
     }
 
@@ -810,7 +780,7 @@ public class JavaPoetUtils {
     }
 
     private static MethodSpec newGetter(TypeSpec.Builder builder, ClassName beanType, TypeVariableName propertyTypeVar, ParameterizedTypeName getterType, String getterFieldName, Class<? extends Throwable> getterChecked) {
-        builder.addField(FieldSpec.builder(getterType, getterFieldName).addModifiers(PUBLIC, FINAL).build());
+        builder.addField(builder(getterType, getterFieldName).addModifiers(PUBLIC, FINAL).build());
         var methodBuilder = methodBuilder("get")
                 .addAnnotation(Override.class)
                 .addModifiers(PUBLIC)
@@ -847,9 +817,6 @@ public class JavaPoetUtils {
         }
         var setter = methodBuilder.build();
         return new PropertyWritable(fieldSpec, setter);
-    }
-
-    private record PropertyWritable(FieldSpec fieldSpec, MethodSpec setter) {
     }
 
     public static ParameterizedTypeName getFunctionType(
@@ -949,7 +916,7 @@ public class JavaPoetUtils {
         for (var setter : builderInfo.getSetters()) {
             var setterName = setter.getName();
             builder.addField(newPropertyConstant(
-                    className, setterName,
+                    setterName, className,
                     TypeName.get(setter.getEvaluatedType()), null, false, null,
                     setter.getSetter(), null).build());
             setterNames.add(setterName);
@@ -1015,7 +982,7 @@ public class JavaPoetUtils {
                                 .build(), PRIVATE, FINAL, STATIC)
                 )
                 .addMethod(
-                        MethodSpec.methodBuilder("values")
+                        methodBuilder("values")
                                 .addModifiers(PUBLIC, FINAL, STATIC)
                                 .returns(
                                         ParameterizedTypeName.get(
@@ -1081,7 +1048,7 @@ public class JavaPoetUtils {
         return property.getField() != null && property.isPublicField();
     }
 
-    private static FieldSpec.Builder newPropertyConstant(ClassName constType, String constName, TypeName paramName,
+    private static FieldSpec.Builder newPropertyConstant(String constName, ClassName constType, TypeName paramName,
                                                          VariableElement field, boolean isPublicField,
                                                          ExecutableElement getter, ExecutableElement setter,
                                                          RecordComponentElement record) {
@@ -1189,13 +1156,13 @@ public class JavaPoetUtils {
     }
 
     static FieldSpec listField(String name, TypeName type, CodeBlock init, Modifier... modifiers) {
-        return FieldSpec.builder(ParameterizedTypeName.get(ClassName.get(List.class), type), name, modifiers)
+        return builder(ParameterizedTypeName.get(ClassName.get(List.class), type), name, modifiers)
                 .initializer(CodeBlock.builder().add("$T.of($L)", List.class, init).build())
                 .build();
     }
 
     static FieldSpec mapField(String name, ClassName key, ClassName value, CodeBlock init, Modifier... modifiers) {
-        return FieldSpec.builder(
+        return builder(
                 ParameterizedTypeName.get(ClassName.get(Map.class), key, value), name, modifiers
         ).initializer(init).build();
     }
@@ -1215,6 +1182,53 @@ public class JavaPoetUtils {
 
     static AnnotationSpec generatedAnnotation() {
         return AnnotationSpec.builder(Generated.class).addMember("value", "\"$L\"", ClassName.get(Meta.class).canonicalName()).build();
+    }
+
+    public record BeanProperties(Map<String, Property> names,
+                                 Map<String, AtomicInteger> weights) {
+
+        public BeanProperties() {
+            this(new LinkedHashMap<>(), new LinkedHashMap<>());
+        }
+
+        public static BeanProperties newBeanProperties(MetaBean bean) {
+            var properties = new BeanProperties();
+            properties.addProperties(bean, 1);
+            return properties;
+        }
+
+        public void addProperties(MetaBean bean, int weight) {
+            var properties = bean.getPublicProperties();
+            for (var property : properties) {
+                if (!property.isExcluded()) {
+                    var propertyName = property.getName();
+                    if (!names.containsKey(propertyName)) {
+                        names.put(propertyName, property);
+                    }
+                    weights.computeIfAbsent(propertyName, k -> new AtomicInteger(weight)).incrementAndGet();
+                }
+            }
+            var sc = bean.getSuperclass();
+            var superClassPropsWeight = 2;
+            while (sc != null) {
+                addProperties(sc, superClassPropsWeight);
+                sc = sc.getSuperclass();
+                superClassPropsWeight++;
+            }
+            addInterfaceProps(bean.getInterfaces(), weight);
+        }
+
+        public void addInterfaceProps(List<MetaBean> interfaces, int weight) {
+            if (interfaces == null) {
+                return;
+            }
+            for (var iface : interfaces) {
+                addProperties(iface, weight);
+            }
+        }
+    }
+
+    private record PropertyWritable(FieldSpec fieldSpec, MethodSpec setter) {
     }
 
     private static class WeightComparator implements Comparator<String> {

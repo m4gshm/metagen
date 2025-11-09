@@ -12,6 +12,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import meta.Meta;
 import meta.Meta.Methods.Content;
+import meta.Meta.Props;
 import meta.jpa.customizer.JpaColumns;
 
 import javax.persistence.AttributeOverride;
@@ -21,6 +22,7 @@ import javax.persistence.Embedded;
 
 import static lombok.AccessLevel.NONE;
 import static lombok.AccessLevel.PUBLIC;
+import static meta.Meta.Content.FULL;
 import static meta.jpa.customizer.JpaColumns.OPT_CLASS_NAME;
 import static meta.jpa.customizer.JpaColumns.OPT_GENERATED_COLUMN_NAME_POST_PROCESS;
 import static meta.jpa.customizer.JpaColumns.OPT_IMPLEMENTS;
@@ -37,7 +39,9 @@ import static meta.jpa.customizer.JpaColumns.OPT_IMPLEMENTS;
                         @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "meta.jpa.Column"),
                         @Meta.Extend.Opt(key = OPT_GENERATED_COLUMN_NAME_POST_PROCESS, value = "toUpperCase"),
                 }),
-        methods = @Meta.Methods(Content.NAME)
+        properties = @Props(FULL),
+        methods = @Meta.Methods(Content.NAME),
+        params = @Meta.Params(FULL)
 )
 @javax.persistence.Entity
 public class UserEntity extends Entity<Long> implements IdAware<Long> {
@@ -60,7 +64,7 @@ public class UserEntity extends Entity<Long> implements IdAware<Long> {
     @JpaColumns.Exclude
     private Tag[] tags;
 
-    @Meta
+    @Meta(properties = @Props(FULL))
     @Data
     @Builder(access = PUBLIC, toBuilder = true)
     @NoArgsConstructor

@@ -1,29 +1,45 @@
+import io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension
+
 plugins {
     `java-library`
     `maven-publish`
     signing
     id("com.gradleup.nmcp").version("0.0.7")
     id("org.asciidoctor.jvm.convert") version "4.0.1"
+    id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
 allprojects {
+    apply(plugin = "io.spring.dependency-management")
+    apply(plugin = "java-library")
+
     group = "io.github.m4gshm"
     version = "0.0.1-rc6"
     repositories {
         mavenCentral()
     }
+
+    the<DependencyManagementExtension>().apply {
+        imports {
+            mavenBom("org.junit:junit-bom:5.9.1")
+        }
+        dependencies {
+            dependency("org.projectlombok:lombok:1.18.42")
+            dependency("io.github.jbock-java:javapoet:1.15")
+            dependency("org.mockito:mockito-junit-jupiter:5.20.0")
+        }
+    }
+    plugins.findPlugin(JavaLibraryPlugin::class).let { javaLibraryPlugin ->
+        dependencies {
+            listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
+                add(it, "org.projectlombok:lombok")
+            }
+        }
+    }
 }
 
 dependencies {
-    compileOnly("org.projectlombok:lombok:1.18.38")
-    annotationProcessor("org.projectlombok:lombok:1.18.38")
-
-    testCompileOnly("org.projectlombok:lombok:1.18.38")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
-
-    implementation("io.github.jbock-java:javapoet:1.15")
-
-    testImplementation(platform("org.junit:junit-bom:5.9.1"))
+    implementation("io.github.jbock-java:javapoet")
     testImplementation("org.junit.jupiter:junit-jupiter")
 }
 
