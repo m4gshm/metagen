@@ -2,6 +2,9 @@ package example.model;
 
 
 import example.IdAware;
+import io.github.m4gshm.meta.Meta.Extend;
+import io.github.m4gshm.meta.Meta.Methods;
+import io.github.m4gshm.meta.Meta.Params;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,38 +13,39 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
-import meta.Meta;
-import meta.Meta.Methods.Content;
-import meta.Meta.Props;
-import meta.jpa.customizer.JpaColumns;
+import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.Meta.Methods.Content;
+import io.github.m4gshm.meta.Meta.Props;
+import io.github.m4gshm.meta.jpa.customizer.JpaColumns;
 
 import javax.persistence.AttributeOverride;
 import javax.persistence.AttributeOverrides;
 import javax.persistence.Column;
 import javax.persistence.Embedded;
 
+import static io.github.m4gshm.meta.Meta.Extend.*;
 import static lombok.AccessLevel.NONE;
 import static lombok.AccessLevel.PUBLIC;
-import static meta.Meta.Content.FULL;
-import static meta.jpa.customizer.JpaColumns.OPT_CLASS_NAME;
-import static meta.jpa.customizer.JpaColumns.OPT_GENERATED_COLUMN_NAME_POST_PROCESS;
-import static meta.jpa.customizer.JpaColumns.OPT_IMPLEMENTS;
+import static io.github.m4gshm.meta.Meta.Content.FULL;
+import static io.github.m4gshm.meta.jpa.customizer.JpaColumns.OPT_CLASS_NAME;
+import static io.github.m4gshm.meta.jpa.customizer.JpaColumns.OPT_GENERATED_COLUMN_NAME_POST_PROCESS;
+import static io.github.m4gshm.meta.jpa.customizer.JpaColumns.OPT_IMPLEMENTS;
 
 @Data
 @SuperBuilder
 @EqualsAndHashCode(callSuper = true)
 @Meta(
         builder = @Meta.Builder(generateMeta = true),
-        customizers = @Meta.Extend(
+        customizers = @Extend(
                 value = JpaColumns.class,
                 opts = {
-                        @Meta.Extend.Opt(key = OPT_CLASS_NAME, value = "Column"),
-                        @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "meta.jpa.Column"),
-                        @Meta.Extend.Opt(key = OPT_GENERATED_COLUMN_NAME_POST_PROCESS, value = "toUpperCase"),
+                        @Opt(key = OPT_CLASS_NAME, value = "Column"),
+                        @Opt(key = OPT_IMPLEMENTS, value = "io.github.m4gshm.meta.jpa.Column"),
+                        @Opt(key = OPT_GENERATED_COLUMN_NAME_POST_PROCESS, value = "toUpperCase"),
                 }),
         properties = @Props(FULL),
-        methods = @Meta.Methods(Content.NAME),
-        params = @Meta.Params(FULL)
+        methods = @Methods(Content.NAME),
+        params = @Params(FULL)
 )
 @javax.persistence.Entity
 public class UserEntity extends Entity<Long> implements IdAware<Long> {

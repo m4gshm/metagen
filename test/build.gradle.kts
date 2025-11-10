@@ -10,6 +10,8 @@ dependencies {
 //    annotationProcessor("io.github.m4gshm:metagen:0.0.1-rc1")
 //    implementation("io.github.m4gshm:metagen:0.0.1-rc1")
     annotationProcessor(project(":meta-processor"))
+    annotationProcessor(project(":meta-processor-utils"))
+    compileOnly(project(":meta-processor-utils"))
     annotationProcessor(project(":meta-customizer-jpa-processor"))
     implementation(project(":meta-api"))
     implementation(project(":meta-customizer-jpa-api"))

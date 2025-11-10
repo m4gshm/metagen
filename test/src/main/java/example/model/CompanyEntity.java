@@ -4,12 +4,14 @@ package example.model;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-import meta.Meta;
-import meta.Meta.Methods.Content;
-import meta.jpa.customizer.JpaColumns;
+import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.Meta.Methods.Content;
+import io.github.m4gshm.meta.jpa.customizer.JpaColumns;
 
+import static io.github.m4gshm.meta.jpa.customizer.JpaColumns.OPT_CLASS_NAME;
+import static io.github.m4gshm.meta.jpa.customizer.JpaColumns.OPT_GENERATED_COLUMN_NAME_POST_PROCESS;
+import static io.github.m4gshm.meta.jpa.customizer.JpaColumns.OPT_IMPLEMENTS;
 import static lombok.AccessLevel.NONE;
-import static meta.jpa.customizer.JpaColumns.*;
 
 @Builder
 @Meta(
@@ -18,7 +20,7 @@ import static meta.jpa.customizer.JpaColumns.*;
                 value = JpaColumns.class,
                 opts = {
                         @Meta.Extend.Opt(key = OPT_CLASS_NAME, value = "Column"),
-                        @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "meta.jpa.Column"),
+                        @Meta.Extend.Opt(key = OPT_IMPLEMENTS, value = "io.github.m4gshm.meta.jpa.Column"),
                         @Meta.Extend.Opt(key = OPT_GENERATED_COLUMN_NAME_POST_PROCESS, value = "toUpperCase"),
                 }),
         methods = @Meta.Methods(Content.NAME)

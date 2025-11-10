@@ -1,7 +1,7 @@
 = Metagen
 
 == Metagen (under construction)
-Enumerated constants generator, based on bean properties and type parameters.
+Enumerated constants generator, based on bean props and type parameters.
 
 Requires Java 17 or higher.
 

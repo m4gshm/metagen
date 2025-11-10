@@ -14,7 +14,7 @@ allprojects {
     apply(plugin = "java-library")
 
     group = "io.github.m4gshm"
-    version = "0.0.1-rc6"
+    version = "0.0.1-rc7"
     repositories {
         mavenCentral()
     }
@@ -29,10 +29,12 @@ allprojects {
             dependency("org.mockito:mockito-junit-jupiter:5.20.0")
         }
     }
-    plugins.findPlugin(JavaLibraryPlugin::class).let { javaLibraryPlugin ->
-        dependencies {
-            listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
-                add(it, "org.projectlombok:lombok")
+    if (!project.name.contains("no-lombok")) {
+        plugins.findPlugin(JavaLibraryPlugin::class).let { javaLibraryPlugin ->
+            dependencies {
+                listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
+                    add(it, "org.projectlombok:lombok")
+                }
             }
         }
     }
@@ -56,7 +58,7 @@ java {
 }
 
 tasks.asciidoctor {
-    dependsOn(":test:classes")
+//    dependsOn(":test:classes")
     baseDirFollowsSourceFile()
     outputOptions {
         backends("docbook")
