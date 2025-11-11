@@ -7,6 +7,7 @@ import io.github.m4gshm.meta.processor.util.MetaBeanExtractor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import java.util.Objects;
 import java.util.Set;
@@ -23,7 +24,8 @@ public class MetaAnnotationProcessor extends FileGenerateAnnotationProcessor {
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
         var extractor = new MetaBeanExtractor(processingEnv.getMessager());
-        writeFiles(roundEnv, roundEnv.getElementsAnnotatedWith(Meta.class).stream()
+        var elementsAnnotatedWith = roundEnv.getElementsAnnotatedWith(Meta.class);
+        writeFiles(roundEnv, elementsAnnotatedWith.stream()
                 .map(e -> e instanceof TypeElement type ? type : null)
                 .filter(Objects::nonNull)
                 .map(type -> extractor.getBean(type, null, null, type.getAnnotation(Meta.class)))

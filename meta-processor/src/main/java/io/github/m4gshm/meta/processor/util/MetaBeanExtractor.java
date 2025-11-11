@@ -1,10 +1,10 @@
 package io.github.m4gshm.meta.processor.util;
 
-import lombok.RequiredArgsConstructor;
 import io.github.m4gshm.meta.Meta;
 import io.github.m4gshm.meta.processor.MetaBean;
 import io.github.m4gshm.meta.processor.MetaBean.BeanBuilder;
 import io.github.m4gshm.meta.processor.MetaBean.Param;
+import lombok.RequiredArgsConstructor;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
@@ -32,6 +32,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static io.github.m4gshm.meta.processor.MetaBean.newMetaBean;
+import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.getUniqueName;
+import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 import static java.beans.Introspector.decapitalize;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
@@ -41,8 +44,6 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.BOOLEAN;
 import static javax.tools.Diagnostic.Kind.WARNING;
-import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.getUniqueName;
-import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 
 @RequiredArgsConstructor
 public class MetaBeanExtractor {
@@ -377,21 +378,19 @@ public class MetaBeanExtractor {
         if (type == null || isNoneType(type) || isJavaLang(type)) {
             return null;
         }
-
         var exists = touched.get(type);
         if (exists != null) {
             return exists;
         }
 
-        var metaBean = new MetaBean(type);
+        var metaBean = newMetaBean(type, meta);
         touched.put(type, metaBean);
-
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
         var methods = new LinkedHashMap<String, ExecutableElement>();
         var nestedTypes = new ArrayList<TypeElement>();
         var isRecord = type.getKind() == RECORD;
-        var recordComponents = isRecord ?  type.getRecordComponents(): List.<RecordComponentElement>of();
+        var recordComponents = isRecord ? type.getRecordComponents() : List.<RecordComponentElement>of();
         for (var recordComponent : recordComponents) {
             var recordName = recordComponent.getSimpleName();
             var propType = recordComponent.asType();
@@ -472,10 +471,6 @@ public class MetaBeanExtractor {
                 .filter(Objects::nonNull)
                 .toList();
 
-        var name = type.getSimpleName().toString();
-
-        var suffix = ofNullable(meta).map(Meta::suffix).map(String::trim).filter(m -> !m.isEmpty()).orElse(Meta.META);
-
         var builder = ofNullable(meta).map(Meta::builder);
         var detectBuilder = builder.map(Meta.Builder::detect).orElse(false);
         var builderClassName = builder.map(Meta.Builder::className).orElse(Meta.Builder.CLASS_NAME);
@@ -487,7 +482,6 @@ public class MetaBeanExtractor {
 
         metaBean.setRecord(isRecord);
         metaBean.setMeta(meta);
-        metaBean.setName(packageAndPrefix.prefix() + name + suffix);
         metaBean.setPackageName(packageName != null ? packageName : packageAndPrefix.beanPackage());
         metaBean.setSuperclass(superBean);
         metaBean.setInterfaces(interfaceBeans);

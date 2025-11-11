@@ -37,8 +37,4 @@ Output:
 ----
 include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserMeta.java[]
 ----
-[source,java]
-----
-include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserAddressMeta.java[]
-----
 

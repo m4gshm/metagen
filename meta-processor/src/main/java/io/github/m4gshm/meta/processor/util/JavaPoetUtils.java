@@ -30,8 +30,6 @@ import io.jbock.javapoet.TypeName;
 import io.jbock.javapoet.TypeSpec;
 import io.jbock.javapoet.TypeVariableName;
 import io.jbock.javapoet.WildcardTypeName;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 
 import javax.annotation.processing.Generated;
@@ -63,17 +61,20 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static io.github.m4gshm.meta.Meta.Content.FULL;
 import static io.github.m4gshm.meta.Meta.Content.NAME;
 import static io.github.m4gshm.meta.Meta.Content.NONE;
 import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.getMethodName;
+import static io.github.m4gshm.meta.processor.util.MetaCustomizerUtils.instantiate;
 import static io.jbock.javapoet.FieldSpec.builder;
 import static io.jbock.javapoet.MethodSpec.constructorBuilder;
 import static io.jbock.javapoet.MethodSpec.methodBuilder;
 import static io.jbock.javapoet.TypeName.OBJECT;
 import static io.jbock.javapoet.TypeSpec.classBuilder;
 import static io.jbock.javapoet.WildcardTypeName.subtypeOf;
+import static java.util.Arrays.stream;
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
 import static java.util.function.Function.identity;
@@ -89,8 +90,8 @@ import static javax.tools.Diagnostic.Kind.WARNING;
 @UtilityClass
 public class JavaPoetUtils {
 
-    public static TypeSpec.Builder newMetaTypeBuilder(
-            Messager messager, MetaBean bean, Collection<? extends MetaCustomizer> customizers
+    public static TypeSpec newTypeSpec(
+            ClassLoader classLoader, Messager messager, MetaBean bean
     ) {
         var meta = ofNullable(bean.getMeta());
         var props = meta.map(Meta::properties);
@@ -131,7 +132,7 @@ public class JavaPoetUtils {
 
         var typeParameters = bean.getTypeParameters();
 
-        var addParamsType = !typeParameters.isEmpty();
+        var addParamsType = typeParameters != null && !typeParameters.isEmpty();
         var addInheritParamsOf = false;
 
         if (paramsEnum != NONE) {
@@ -558,11 +559,16 @@ public class JavaPoetUtils {
             builder.addType(newBuilderType(beanBuilderInfo));
         }
 
+        var nestedTypes = Stream.ofNullable(bean.getNestedBeans()).flatMap(Collection::stream)
+                .map(nb -> newTypeSpec(classLoader, messager, nb)).toList();
+        nestedTypes.forEach(builder::addType);
+
+        var customizers = getCustomizers(classLoader, messager, bean);
         for (var generator : customizers) {
             generator.customize(messager, bean, builder);
         }
 
-        return builder;
+        return builder.build();
     }
 
     //    @SneakyThrows
@@ -1249,11 +1255,15 @@ public class JavaPoetUtils {
         return AnnotationSpec.builder(Generated.class).addMember("value", "\"$L\"", ClassName.get(Meta.class).canonicalName()).build();
     }
 
-    @Getter
-    @RequiredArgsConstructor
-    public enum Type {
-        CLS("$"), PKG(".");
-        final String delim;
+    static List<MetaCustomizer<TypeSpec.Builder>> getCustomizers(ClassLoader classLoader, Messager messager, MetaBean bean) {
+        return ofNullable(bean.getMeta())
+                .stream()
+                .flatMap(m -> stream(m.customizers()))
+                .map(customizerInfo -> instantiate(messager, customizerInfo,
+                        TypeSpec.Builder.class,
+                        classLoader))
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     public record BeanProperties(Map<String, Property> names,

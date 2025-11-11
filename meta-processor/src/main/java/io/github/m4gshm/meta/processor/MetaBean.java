@@ -13,10 +13,13 @@ import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
+import static java.util.Optional.ofNullable;
 import static javax.lang.model.element.Modifier.PUBLIC;
 
 /**
@@ -25,28 +28,45 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 @Data
 public class MetaBean {
     private final TypeElement type;
-    private String name;
+    private final String name;
     private String packageName;
     private List<ExecutableElement> methods;
     private List<Property> properties;
     private List<Param> typeParameters;
     private MetaBean superclass;
     private List<TypeElement> nestedTypes;
+    private List<MetaBean> nestedBeans;
     private List<MetaBean> interfaces;
     private boolean isRecord;
     private Meta meta;
     private BeanBuilder beanBuilderInfo;
 
-    public MetaBean(TypeElement type) {
+    private MetaBean(TypeElement type, String name) {
         this.type = type;
+        this.name = name;
+    }
+
+    public static MetaBean newMetaBean(TypeElement type, Meta meta) {
+        return new MetaBean(type, getBeanName(type, meta));
+    }
+
+    public static String getBeanName(TypeElement type, Meta meta) {
+        return type.getSimpleName().toString() + getSuffix(meta);
+    }
+
+    public static String getSuffix(Meta meta) {
+        return ofNullable(meta).map(Meta::suffix).map(String::trim).filter(m -> !m.isEmpty()).orElse(Meta.META);
     }
 
     public List<MetaBean.Property> getPublicProperties() {
-        return this.getProperties().stream().filter(MetaBean.Property::isPublic).toList();
+        return Stream.ofNullable(getProperties()).flatMap(Collection::stream)
+                .filter(MetaBean.Property::isPublic).toList();
     }
 
     public List<ExecutableElement> getPublicMethods() {
-        return this.getMethods().stream().filter(ee -> ee.getModifiers().contains(PUBLIC)).toList();
+        return Stream.ofNullable(getMethods()).flatMap(Collection::stream).filter(ee -> {
+            return ee.getModifiers().contains(PUBLIC);
+        }).toList();
     }
 
     public String getClassName() {

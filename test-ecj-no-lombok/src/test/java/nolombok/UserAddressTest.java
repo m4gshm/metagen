@@ -1,7 +1,7 @@
 package nolombok;
 
 
-import nolombok.UserAddressMeta.Prop;
+import nolombok.UserMeta.AddressMeta.Prop;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

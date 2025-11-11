@@ -110,40 +110,31 @@ public final class UserMeta {
       return values;
     }
   }
-}
-```
 
-``` java
-package example.simple;
+  @Generated("io.github.m4gshm.meta.Meta")
+  public final class AddressMeta {
+    public static final Class<User.Address> type = User.Address.class;
 
-import java.lang.Class;
-import java.lang.String;
-import java.util.List;
-import javax.annotation.processing.Generated;
-
-@Generated("io.github.m4gshm.meta.Meta")
-public final class UserAddressMeta {
-  public static final Class<User.Address> type = User.Address.class;
-
-  UserAddressMeta() {
-  }
-
-  public static class Prop {
-    public static final String postalCode = "postalCode";
-
-    public static final String city = "city";
-
-    public static final String street = "street";
-
-    public static final String fullAddress = "fullAddress";
-
-    private static final List<String> values = List.of(postalCode, city, street, fullAddress);
-
-    Prop() {
+    AddressMeta() {
     }
 
-    public static final List<String> values() {
-      return values;
+    public static class Prop {
+      public static final String postalCode = "postalCode";
+
+      public static final String city = "city";
+
+      public static final String street = "street";
+
+      public static final String fullAddress = "fullAddress";
+
+      private static final List<String> values = List.of(postalCode, city, street, fullAddress);
+
+      Prop() {
+      }
+
+      public static final List<String> values() {
+        return values;
+      }
     }
   }
 }

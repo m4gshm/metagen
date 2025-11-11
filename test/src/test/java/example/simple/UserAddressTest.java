@@ -1,7 +1,7 @@
 package example.simple;
 
 
-import example.simple.UserAddressMeta.Prop;
+import example.simple.UserMeta.AddressMeta.Prop;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

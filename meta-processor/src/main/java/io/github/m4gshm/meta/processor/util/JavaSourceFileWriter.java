@@ -1,34 +1,31 @@
 package io.github.m4gshm.meta.processor.util;
 
 import io.github.m4gshm.meta.MetaModel;
+import io.github.m4gshm.meta.processor.MetaBean;
 import io.jbock.javapoet.ClassName;
 import io.jbock.javapoet.CodeBlock;
 import io.jbock.javapoet.JavaFile;
 import io.jbock.javapoet.ParameterSpec;
 import io.jbock.javapoet.ParameterizedTypeName;
 import io.jbock.javapoet.TypeSpec;
-import io.github.m4gshm.meta.processor.MetaBean;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 
-import static io.jbock.javapoet.MethodSpec.methodBuilder;
-import static io.jbock.javapoet.TypeSpec.classBuilder;
-import static java.util.Arrays.stream;
-import static java.util.Optional.ofNullable;
-import static javax.lang.model.element.Modifier.FINAL;
-import static javax.lang.model.element.Modifier.PRIVATE;
-import static javax.lang.model.element.Modifier.PUBLIC;
 import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.generatedAnnotation;
 import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.initMapByEntries;
 import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.instanceField;
 import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.mapField;
-import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.newMetaTypeBuilder;
-import static io.github.m4gshm.meta.processor.util.MetaCustomizerUtils.instantiate;
+import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.newTypeSpec;
+import static io.jbock.javapoet.MethodSpec.methodBuilder;
+import static io.jbock.javapoet.TypeSpec.classBuilder;
+import static java.util.Arrays.stream;
+import static javax.lang.model.element.Modifier.FINAL;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PUBLIC;
 
 public class JavaSourceFileWriter extends AbstractFileWriter<TypeSpec> {
 
@@ -38,14 +35,7 @@ public class JavaSourceFileWriter extends AbstractFileWriter<TypeSpec> {
 
     @Override
     protected TypeSpec newClassSpec(MetaBean bean) {
-        var builderClass = TypeSpec.Builder.class;
-        var customizers = ofNullable(bean.getMeta())
-                .stream()
-                .flatMap(m -> stream(m.customizers()))
-                .map(customizerInfo -> instantiate(processingEnv.getMessager(), customizerInfo, builderClass, getClass().getClassLoader()))
-                .filter(Objects::nonNull)
-                .toList();
-        return newMetaTypeBuilder(processingEnv.getMessager(), bean, customizers).build();
+        return newTypeSpec(getClass().getClassLoader(), processingEnv.getMessager(), bean);
     }
 
     @Override
