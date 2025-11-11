@@ -52,7 +52,7 @@ public class User implements IdAware<Long> {
     @Setter(NONE)
     private Integer version; // excluded private field
 
-    @Meta(properties = @Props(NAME))
+    @Meta
     public record Address(String postalCode, String city, String street) {
         public String getFullAddress() {
             return postalCode + ", " + city + ", " + street;
@@ -73,9 +73,78 @@ public interface IdAware<ID> {
 Output:
 
 ``` java
-Unresolved directive in readme.adoc - include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserMeta.java[]
+package example.simple;
+
+import java.lang.Class;
+import java.lang.Long;
+import java.lang.String;
+import java.util.List;
+import javax.annotation.processing.Generated;
+
+@Generated("io.github.m4gshm.meta.Meta")
+public final class UserMeta {
+  public static final Class<User> type = User.class;
+
+  UserMeta() {
+  }
+
+  public static class IdAwareParam {
+    public static final Class<Long> ID = Long.class;
+  }
+
+  public static class Prop {
+    public static final String id = "id";
+
+    public static final String address = "address";
+
+    public static final String name = "name";
+
+    public static final String age = "age";
+
+    private static final List<String> values = List.of(id, address, name, age);
+
+    Prop() {
+    }
+
+    public static final List<String> values() {
+      return values;
+    }
+  }
+}
 ```
 
 ``` java
-Unresolved directive in readme.adoc - include::../../../test/build/generated/sources/annotationProcessor/java/main/example/simple/UserAddressMeta.java[]
+package example.simple;
+
+import java.lang.Class;
+import java.lang.String;
+import java.util.List;
+import javax.annotation.processing.Generated;
+
+@Generated("io.github.m4gshm.meta.Meta")
+public final class UserAddressMeta {
+  public static final Class<User.Address> type = User.Address.class;
+
+  UserAddressMeta() {
+  }
+
+  public static class Prop {
+    public static final String postalCode = "postalCode";
+
+    public static final String city = "city";
+
+    public static final String street = "street";
+
+    public static final String fullAddress = "fullAddress";
+
+    private static final List<String> values = List.of(postalCode, city, street, fullAddress);
+
+    Prop() {
+    }
+
+    public static final List<String> values() {
+      return values;
+    }
+  }
+}
 ```
