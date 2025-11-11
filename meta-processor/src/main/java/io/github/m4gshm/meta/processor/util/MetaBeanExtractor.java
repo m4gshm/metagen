@@ -34,7 +34,6 @@ import java.util.Set;
 
 import static io.github.m4gshm.meta.processor.MetaBean.newMetaBean;
 import static io.github.m4gshm.meta.processor.util.JavaPoetUtils.getUniqueName;
-import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
 import static java.beans.Introspector.decapitalize;
 import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
@@ -369,6 +368,23 @@ public class MetaBeanExtractor {
         return childPopulatedParams;
     }
 
+    public static String getPackageName(TypeElement type) {
+        var owner = type.getEnclosingElement();
+        var beanPackage = "";
+        if (owner instanceof PackageElement packageElement) {
+            beanPackage = packageElement.getQualifiedName().toString();
+        } else if (owner instanceof TypeElement externalClass) {
+            TypeElement superExternalClass;
+            while (null != (superExternalClass = getExternalClass(externalClass))) {
+                externalClass = superExternalClass;
+            }
+            if (externalClass.getEnclosingElement() instanceof PackageElement packageElement) {
+                beanPackage = packageElement.getQualifiedName().toString();
+            }
+        }
+        return beanPackage;
+    }
+
     public MetaBean getBean(TypeElement type, DeclaredType declaredType, String packageName, Meta annotation) {
         return getBean(type, extractGenericParams(type, declaredType), packageName, annotation, new HashMap<>());
     }
@@ -382,8 +398,7 @@ public class MetaBeanExtractor {
         if (exists != null) {
             return exists;
         }
-
-        var metaBean = newMetaBean(type, meta);
+        var metaBean = newMetaBean(type, meta, packageName);
         touched.put(type, metaBean);
 
         var properties = new LinkedHashMap<String, MetaBean.Property>();
@@ -478,11 +493,9 @@ public class MetaBeanExtractor {
         var beanBuilder = detectBuilder
                 ? newBeanBuilder(messager, type, typeParameters, builderClassName, superBean != null ? superBean.getBeanBuilderInfo() : null)
                 : null;
-        var packageAndPrefix = newPackageAndPrefix(type);
 
         metaBean.setRecord(isRecord);
         metaBean.setMeta(meta);
-        metaBean.setPackageName(packageName != null ? packageName : packageAndPrefix.beanPackage());
         metaBean.setSuperclass(superBean);
         metaBean.setInterfaces(interfaceBeans);
         metaBean.setNestedTypes(nestedTypes);
@@ -515,29 +528,6 @@ public class MetaBeanExtractor {
             propAnnotations.addAll(annotations);
         }
         property.setAnnotations(propAnnotations);
-    }
-
-    public record PackageAndPrefix(String beanPackage, StringBuilder prefix) {
-        public static PackageAndPrefix newPackageAndPrefix(TypeElement type) {
-            var owner = type.getEnclosingElement();
-            var beanPackage = "";
-            var prefix = new StringBuilder();
-            if (owner instanceof PackageElement packageElement) {
-                beanPackage = packageElement.getQualifiedName().toString();
-            } else if (owner instanceof TypeElement externalClass) {
-                prefix = new StringBuilder(externalClass.getSimpleName().toString());
-                TypeElement superExternalClass;
-                while (null != (superExternalClass = getExternalClass(externalClass))) {
-                    prefix.insert(0, superExternalClass.getSimpleName().toString());
-                    externalClass = superExternalClass;
-                }
-
-                if (externalClass.getEnclosingElement() instanceof PackageElement packageElement) {
-                    beanPackage = packageElement.getQualifiedName().toString();
-                }
-            }
-            return new PackageAndPrefix(beanPackage, prefix);
-        }
     }
 
     record TypeInfo(DeclaredType declaredType, TypeElement typeElement) {

@@ -46,7 +46,7 @@ public abstract class AbstractFileWriter<T> {
             var bean = e.getValue();
             var enclosingElement = bean.getType().getEnclosingElement();
             if (enclosingElement instanceof TypeElement typeElement) {
-                var ownerBean = byType.getOrDefault(enclosingElement, newMetaBean(typeElement, null));
+                var ownerBean = byType.getOrDefault(enclosingElement, newMetaBean(typeElement, null, null));
                 return Stream.of(Map.entry(ownerBean, Stream.of(bean)));
             } else if (enclosingElement instanceof PackageElement) {
                 return Stream.of(Map.entry(bean, Stream.<MetaBean>empty()));

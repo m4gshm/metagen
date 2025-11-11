@@ -1,6 +1,7 @@
 package io.github.m4gshm.meta.processor;
 
 import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.processor.util.MetaBeanExtractor;
 import lombok.Builder;
 import lombok.Data;
 
@@ -29,7 +30,7 @@ import static javax.lang.model.element.Modifier.PUBLIC;
 public class MetaBean {
     private final TypeElement type;
     private final String name;
-    private String packageName;
+    private final String packageName;
     private List<ExecutableElement> methods;
     private List<Property> properties;
     private List<Param> typeParameters;
@@ -41,13 +42,15 @@ public class MetaBean {
     private Meta meta;
     private BeanBuilder beanBuilderInfo;
 
-    private MetaBean(TypeElement type, String name) {
+    private MetaBean(TypeElement type, String name, String packageName) {
         this.type = type;
         this.name = name;
+        this.packageName = packageName;
     }
 
-    public static MetaBean newMetaBean(TypeElement type, Meta meta) {
-        return new MetaBean(type, getBeanName(type, meta));
+    public static MetaBean newMetaBean(TypeElement type, Meta meta, String packageName) {
+        return new MetaBean(type, getBeanName(type, meta), packageName != null ? packageName
+                : MetaBeanExtractor.getPackageName(type));
     }
 
     public static String getBeanName(TypeElement type, Meta meta) {

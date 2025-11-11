@@ -19,7 +19,7 @@ import java.util.Set;
 import static java.util.stream.Stream.ofNullable;
 import static javax.lang.model.SourceVersion.RELEASE_17;
 import static io.github.m4gshm.meta.Module.DestinationPackage.ModuleNameBased;
-import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.PackageAndPrefix.newPackageAndPrefix;
+import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.getPackageName;
 
 @SupportedAnnotationTypes("io.github.m4gshm.meta.Module")
 @SupportedSourceVersion(RELEASE_17)
@@ -36,7 +36,7 @@ public class ModuleAnnotationProcessor extends FileGenerateAnnotationProcessor {
                     var module = Optional.ofNullable(type.getAnnotation(Module.class));
                     var destinationPackage = module.map(Module::destinationPackage).orElse(ModuleNameBased);
                     var modulePackageName = type.getSimpleName().toString().toLowerCase();
-                    var rootPackage = newPackageAndPrefix(type).beanPackage();
+                    var rootPackage = getPackageName(type);
                     var enclosedElements = type.getEnclosedElements();
                     return ofNullable(enclosedElements)
                             .flatMap(Collection::stream)
