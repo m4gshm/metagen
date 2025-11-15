@@ -7,6 +7,7 @@ module io.github.m4gshm.meta.processor {
 
     exports io.github.m4gshm.meta.processor;
     exports io.github.m4gshm.meta.processor.util;
+    exports io.github.m4gshm.meta.processor.converter;
 
     provides javax.annotation.processing.Processor with
             io.github.m4gshm.meta.processor.MetaAnnotationProcessor,

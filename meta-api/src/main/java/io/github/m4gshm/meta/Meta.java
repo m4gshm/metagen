@@ -4,6 +4,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.function.Function;
 
+import static io.github.m4gshm.meta.Meta.ConstantNameStrategy.AS_IS;
 import static io.github.m4gshm.meta.Meta.Content.NAME;
 import static io.github.m4gshm.meta.Meta.Methods.Content.NONE;
 import static java.lang.annotation.ElementType.FIELD;
@@ -89,6 +90,12 @@ public @interface Meta {
         FULL
     }
 
+    enum ConstantNameStrategy {
+        AS_IS,
+        SNAKE_CASE,
+        UPPER_SNAKE_CASE;
+    }
+
     /**
      * Describes the properties part of the metadata.
      */
@@ -103,7 +110,9 @@ public @interface Meta {
 
         String methodName() default METHOD_NAME;
 
-        Class<? extends Function<String, String>> nameValueConvert() default AsIs.class;
+        ConstantNameStrategy constName() default AS_IS;
+
+        Class<? extends Function<String, String>> nameValueCustomizer() default AsIs.class;
 
         interface AsIs extends Function<String, String> {
 

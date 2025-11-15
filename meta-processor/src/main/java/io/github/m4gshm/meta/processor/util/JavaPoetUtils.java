@@ -6,6 +6,7 @@ import io.github.m4gshm.meta.CheckedRead;
 import io.github.m4gshm.meta.CheckedReadWrite;
 import io.github.m4gshm.meta.CheckedWrite;
 import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.Meta.ConstantNameStrategy;
 import io.github.m4gshm.meta.Meta.Params;
 import io.github.m4gshm.meta.MetaModel;
 import io.github.m4gshm.meta.ParametersAware;
@@ -19,6 +20,7 @@ import io.github.m4gshm.meta.processor.MetaBean;
 import io.github.m4gshm.meta.processor.MetaBean.Param;
 import io.github.m4gshm.meta.processor.MetaBean.Property;
 import io.github.m4gshm.meta.processor.MetaCustomizer;
+import io.github.m4gshm.meta.processor.NameConverter;
 import io.jbock.javapoet.AnnotationSpec;
 import io.jbock.javapoet.ClassName;
 import io.jbock.javapoet.CodeBlock;
@@ -276,6 +278,10 @@ public class JavaPoetUtils {
 
             var propertyValConverter = props.map(props1 -> getPropertyValueConverter(messager, props1)).orElse(identity());
 
+            var constantName = props.map(props1 -> props1.constName()).orElse(ConstantNameStrategy.AS_IS);
+            var constantNameConverter = getConstantNameConverter(constantName);
+
+            var finalPropertyNames = new HashSet<String>();
             for (var propertyName : orderedProperties) {
                 var property = requireNonNull(properties.names().get(propertyName), propertyName + " is null");
                 var read = isReadable(property);
@@ -335,9 +341,11 @@ public class JavaPoetUtils {
 //                    typ = propType;
 //                }
 
-                var fieldSpec = newPropertyField(propsEnum, property.getName(),
-                        propertyValConverter.apply(property.getName()),
-                        property, typ);
+                var finalPropertyName = getUniqueName(constantNameConverter.apply(property.getName()), uniqueNames);
+                var finalPropertyValue = propertyValConverter.apply(property.getName());
+                finalPropertyNames.add(finalPropertyName);
+                var fieldSpec = newPropertyField(propsEnum, finalPropertyName,
+                        finalPropertyValue, property, typ);
                 if (fieldSpec != null) {
                     propsClassBuilder.addField(fieldSpec.build());
                 }
@@ -346,7 +354,8 @@ public class JavaPoetUtils {
             if (propsEnum != FULL) {
                 propsClassBuilder.addMethod(constructorBuilder().build());
                 if (!properties.names().isEmpty()) {
-                    propsClassBuilder = addValues(propsClassBuilder, ClassName.get(String.class), properties.names().keySet(), uniqueNames);
+                    propsClassBuilder = addValues(propsClassBuilder, ClassName.get(String.class),
+                            finalPropertyNames, uniqueNames);
                 }
             } else {
                 var readWriteInterface = readWriteInterface(beanType, typeVariable,
@@ -416,7 +425,7 @@ public class JavaPoetUtils {
                     propsClassBuilder.addType(subType.build());
                 }
 
-                uniqueNames.addAll(properties.names().keySet());
+                uniqueNames.addAll(finalPropertyNames);
 
                 var nameFieldName = getUniqueName("name", uniqueNames);
                 var typeFieldName = getUniqueName("type", uniqueNames);
@@ -457,7 +466,7 @@ public class JavaPoetUtils {
                 }
 
                 propsClassBuilder.addMethod(constructor.addCode(constructorBody.build()).build());
-                propsClassBuilder = addValues(propsClassBuilder, typeName, properties.names().keySet(), 1, uniqueNames);
+                propsClassBuilder = addValues(propsClassBuilder, typeName, finalPropertyNames, 1, uniqueNames);
             }
             builder.addType(propsClassBuilder.build());
             if (propsEnum == FULL) {
@@ -572,12 +581,20 @@ public class JavaPoetUtils {
         return builder.build();
     }
 
+    private static Function<String, String> getConstantNameConverter(ConstantNameStrategy constantNameStrategy) {
+        return switch (constantNameStrategy) {
+            case AS_IS -> identity();
+            case SNAKE_CASE -> NameConverter.SNAKE_CASE;
+            case UPPER_SNAKE_CASE -> NameConverter.UPPER_SNAKE_CASE;
+        };
+    }
+
     //    @SneakyThrows
     @SuppressWarnings("unchecked")
     private static Function<String, String> getPropertyValueConverter(Messager messager, Meta.Props props) throws RuntimeException {
         Class<? extends Function<String, String>> convClass = null;
         try {
-            convClass = props.nameValueConvert();
+            convClass = props.nameValueCustomizer();
         } catch (MirroredTypeException mte) {
             var typeMirror = mte.getTypeMirror();
             if (typeMirror instanceof DeclaredType declaredType) {

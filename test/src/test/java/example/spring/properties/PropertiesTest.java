@@ -8,9 +8,9 @@ public class PropertiesTest {
 
     @Test
     public void testProps() {
-        assertEquals("enabled", PropertiesMeta.Prop.enabled);
-        assertEquals("connection-type", PropertiesMeta.Prop.connectionType);
-        assertEquals("cron-scheduler-enabled", PropertiesMeta.Prop.cronSchedulerEnabled);
+        assertEquals("enabled", PropertiesMeta.Prop.ENABLED);
+        assertEquals("connection-type", PropertiesMeta.Prop.CONNECTION_TYPE);
+        assertEquals("cron-scheduler-enabled", PropertiesMeta.Prop.CRON_SCHEDULER_ENABLED);
     }
 
 }
