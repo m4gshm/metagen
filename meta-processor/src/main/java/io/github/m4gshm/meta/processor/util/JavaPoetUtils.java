@@ -66,6 +66,7 @@ import java.util.stream.Stream;
 import static io.github.m4gshm.meta.Meta.Content.FULL;
 import static io.github.m4gshm.meta.Meta.Content.NAME;
 import static io.github.m4gshm.meta.Meta.Content.NONE;
+import static io.github.m4gshm.meta.Meta.Content.TYPE;
 import static io.github.m4gshm.meta.processor.util.MetaBeanExtractor.getMethodName;
 import static io.github.m4gshm.meta.processor.util.MetaCustomizerUtils.instantiate;
 import static io.jbock.javapoet.FieldSpec.builder;
@@ -809,6 +810,8 @@ public class JavaPoetUtils {
             if (!paramNames.isEmpty()) {
                 addValues(typesBuilder, ClassName.get(String.class), paramNames, uniqueNames);
             }
+        } else if (content == TYPE) {
+            addValues(typesBuilder, wildcardParametrized(ClassName.get(Class.class), 1), paramNames, uniqueNames);
         }
 
         return typesBuilder.build();

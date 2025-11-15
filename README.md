@@ -90,6 +90,12 @@ public final class UserMeta {
 
   public static class IdAwareParam {
     public static final Class<Long> ID = Long.class;
+
+    private static final List<Class<?>> values = List.of(ID);
+
+    public static final List<Class<?>> values() {
+      return values;
+    }
   }
 
   public static class Prop {

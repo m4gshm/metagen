@@ -3,7 +3,7 @@ import io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension
 plugins {
 //    `java-library`
 //    `maven-publish`
-    signing
+//    signing apply false
     id("com.gradleup.nmcp").version("0.0.7")
     id("org.asciidoctor.jvm.convert") version "4.0.1"
     id("io.spring.dependency-management") version "1.1.7" apply false
@@ -48,6 +48,10 @@ allprojects {
         targetCompatibility = javaVersion
         sourceCompatibility = javaVersion
         modularity.inferModulePath.set(true)
+    }
+
+    tasks.named<Test>("test") {
+        useJUnitPlatform()
     }
 
     the<PublishingExtension>().apply {
@@ -96,23 +100,6 @@ allprojects {
     }
 }
 
-dependencies {
-//    implementation("io.github.jbock-java:javapoet")
-//    testImplementation("org.junit.jupiter:junit-jupiter")
-}
-
-//tasks.test {
-//    useJUnitPlatform()
-//}
-
-//java {
-//    withSourcesJar()
-//    withJavadocJar()
-//    targetCompatibility = JavaVersion.VERSION_17
-//    sourceCompatibility = JavaVersion.VERSION_17
-//    modularity.inferModulePath.set(true)
-//}
-
 tasks.asciidoctor {
     dependsOn(":test:classes")
     baseDirFollowsSourceFile()
@@ -132,50 +119,6 @@ tasks.build {
         dependsOn("pandoc")
     }
 }
-
-//publishing {
-//    publications {
-//        create<MavenPublication>("java") {
-//            pom {
-//                description.set("Enumerated constants generator, based on bean properties and type parameters")
-//                url.set("https://github.com/m4gshm/metagen")
-//                properties.put("maven.compiler.target", "${java.targetCompatibility}")
-//                properties.put("maven.compiler.source", "${java.sourceCompatibility}")
-//                developers {
-//                    developer {
-//                        id.set("m4gshm")
-//                        name.set("Bulgakov Alexander")
-//                        email.set("mfourgeneralsherman@gmail.com")
-//                    }
-//                }
-//                scm {
-//                    connection.set("scm:git:https://github.com/m4gshm/metagen.git")
-//                    developerConnection.set("scm:git:https://github.com/m4gshm/metagen.git")
-//                    url.set("https://github.com/m4gshm/metagen")
-//                }
-//                licenses {
-//                    license {
-//                        name.set("MIT License")
-//                        url.set("https://github.com/m4gshm/metagen?tab=MIT-1-ov-file#readme")
-//                    }
-//                }
-//            }
-//            from(components["java"])
-//        }
-//    }
-////    repositories {
-////        maven("file://$rootDir/../m4gshm.github.io/maven2") {
-////            name = "GithubMavenRepo"
-////        }
-////    }
-//}
-
-//if (project.properties["signing.keyId"] != null) {
-//    signing {
-//        val extension = extensions.getByName("publishing") as PublishingExtension
-//        sign(extension.publications)
-//    }
-//}
 
 nmcp {
     publishAggregation {
