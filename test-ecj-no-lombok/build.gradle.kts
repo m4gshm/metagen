@@ -1,13 +1,6 @@
 plugins {
     id("io.github.themrmilchmann.ecj") version "0.2.0"
 }
-repositories {
-    mavenCentral()
-}
-
-//configurations {
-//    create("ecj")
-//}
 
 dependencies {
     annotationProcessor(project(":meta-processor"))
@@ -21,7 +14,6 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-junit-jupiter")
-//    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {

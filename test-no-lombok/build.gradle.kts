@@ -2,11 +2,10 @@ plugins {
     id("java")
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
+//    annotationProcessor("io.github.m4gshm:meta-processor:0.0.1-rc7")
+//    implementation("io.github.m4gshm:meta-api:0.0.1-rc7")
+
     annotationProcessor(project(":meta-processor"))
     compileOnly(project(":meta-api"))
 

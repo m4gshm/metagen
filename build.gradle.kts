@@ -9,11 +9,10 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
 
+val javaVersion = JavaVersion.VERSION_17
+
 allprojects {
     apply(plugin = "io.spring.dependency-management")
-    apply(plugin = "java-library")
-    apply(plugin = "maven-publish")
-    apply(plugin = "signing")
 
     group = "io.github.m4gshm"
     version = "0.0.1-rc7"
@@ -31,17 +30,13 @@ allprojects {
             dependency("org.mockito:mockito-junit-jupiter:5.20.0")
         }
     }
-    if (!project.name.contains("no-lombok")) {
-        plugins.findPlugin(JavaLibraryPlugin::class).let { javaLibraryPlugin ->
-            dependencies {
-                listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
-                    add(it, "org.projectlombok:lombok")
-                }
-            }
-        }
-    }
+}
 
-    val javaVersion = JavaVersion.VERSION_17
+subprojects {
+    apply(plugin = "java-library")
+    apply(plugin = "maven-publish")
+    apply(plugin = "signing")
+
     the<JavaPluginExtension>().apply {
         withSourcesJar()
         withJavadocJar()
@@ -90,6 +85,16 @@ allprojects {
 //                name = "GithubMavenRepo"
 //            }
 //        }
+    }
+
+    if (!project.name.contains("no-lombok")) {
+        plugins.findPlugin(JavaLibraryPlugin::class).let { javaLibraryPlugin ->
+            dependencies {
+                listOf("compileOnly", "annotationProcessor", "testCompileOnly", "testAnnotationProcessor").forEach {
+                    add(it, "org.projectlombok:lombok")
+                }
+            }
+        }
     }
 
     if (project.properties["signing.keyId"] != null) {
