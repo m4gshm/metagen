@@ -282,7 +282,7 @@ public class JavaPoetUtils {
 
             var propertyNameStrategy = getConstantNameConverter(props.map(Meta.Props::constantName).orElse(AS_IS));
 
-            var finalPropertyNames = new HashSet<String>();
+            var finalPropertyNames = new LinkedHashSet<String>();
             for (var propertyName : orderedProperties) {
                 var property = requireNonNull(properties.names().get(propertyName), propertyName + " is null");
                 var read = isReadable(property);
