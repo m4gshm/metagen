@@ -4,7 +4,8 @@ plugins {
 //    `java-library`
 //    `maven-publish`
 //    signing apply false
-    id("com.gradleup.nmcp").version("0.0.7")
+//    id("com.gradleup.nmcp").version("1.2.1")
+    id("com.gradleup.nmcp.aggregation").version("1.2.1")
     id("org.asciidoctor.jvm.convert") version "4.0.1"
     id("io.spring.dependency-management") version "1.1.7" apply false
 }
@@ -34,8 +35,6 @@ allprojects {
 
 subprojects {
     apply(plugin = "java-library")
-    apply(plugin = "maven-publish")
-    apply(plugin = "signing")
 
     the<JavaPluginExtension>().apply {
         withSourcesJar()
@@ -48,43 +47,55 @@ subprojects {
     tasks.named<Test>("test") {
         useJUnitPlatform()
     }
-
-    the<PublishingExtension>().apply {
-        publications {
-            create<MavenPublication>("java") {
-                pom {
-                    description.set("Enumerated constants generator, based on bean properties and type parameters")
-                    url.set("https://github.com/m4gshm/metagen")
-                    properties.put("maven.compiler.target", "${javaVersion}")
-                    properties.put("maven.compiler.source", "${javaVersion}")
-                    name.set(project.name)
-                    developers {
-                        developer {
-                            id.set("m4gshm")
-                            name.set("Bulgakov Alexander")
-                            email.set("mfourgeneralsherman@gmail.com")
-                        }
-                    }
-                    scm {
-                        connection.set("scm:git:https://github.com/m4gshm/metagen.git")
-                        developerConnection.set("scm:git:https://github.com/m4gshm/metagen.git")
-                        url.set("https://github.com/m4gshm/metagen")
-                    }
-                    licenses {
-                        license {
-                            name.set("MIT License")
-                            url.set("https://github.com/m4gshm/metagen?tab=MIT-1-ov-file#readme")
-                        }
-                    }
-                }
-                from(components["java"])
+    if (!project.name.startsWith("test")) {
+        apply(plugin = "maven-publish")
+        apply(plugin = "signing")
+        if (project.properties["signing.keyId"] != null) {
+            the<SigningExtension>().apply {
+                val extension = extensions.getByName("publishing") as PublishingExtension
+                sign(extension.publications)
             }
         }
-//        repositories {
-//            maven("file://$rootDir/../m4gshm.github.io/maven2") {
-//                name = "GithubMavenRepo"
-//            }
-//        }
+        the<PublishingExtension>().apply {
+            publications {
+                create<MavenPublication>("java") {
+                    pom {
+                        description.set("Enumerated constants generator, based on bean properties and type parameters")
+                        url.set("https://github.com/m4gshm/metagen")
+                        properties.put("maven.compiler.target", "${javaVersion}")
+                        properties.put("maven.compiler.source", "${javaVersion}")
+                        name.set(project.name)
+                        developers {
+                            developer {
+                                id.set("m4gshm")
+                                name.set("Bulgakov Alexander")
+                                email.set("mfourgeneralsherman@gmail.com")
+                            }
+                        }
+                        scm {
+                            connection.set("scm:git:https://github.com/m4gshm/metagen.git")
+                            developerConnection.set("scm:git:https://github.com/m4gshm/metagen.git")
+                            url.set("https://github.com/m4gshm/metagen")
+                        }
+                        licenses {
+                            license {
+                                name.set("MIT License")
+                                url.set("https://github.com/m4gshm/metagen?tab=MIT-1-ov-file#readme")
+                            }
+                        }
+                    }
+                    versionMapping {
+                        usage("java-api") {
+                            fromResolutionOf("runtimeClasspath")
+                        }
+                        usage("java-runtime") {
+                            fromResolutionResult()
+                        }
+                    }
+                    from(components["java"])
+                }
+            }
+        }
     }
 
     if (!project.name.contains("no-lombok")) {
@@ -94,13 +105,6 @@ subprojects {
                     add(it, "org.projectlombok:lombok")
                 }
             }
-        }
-    }
-
-    if (project.properties["signing.keyId"] != null) {
-        the<SigningExtension>().apply {
-            val extension = extensions.getByName("publishing") as PublishingExtension
-            sign(extension.publications)
         }
     }
 }
@@ -125,17 +129,13 @@ tasks.build {
     }
 }
 
-nmcp {
-    publishAggregation {
-        project(":meta-api")
-        project(":meta-processor")
-        project(":meta-processor-utils")
-        project(":meta-customizer-jpa-api")
-        project(":meta-customizer-jpa-processor")
+nmcpAggregation {
+    centralPortal {
         val ossrhUsername = project.properties["ossrhUsername"] as String?
         val ossrhPassword = project.properties["ossrhPassword"] as String?
         username.set(ossrhUsername)
         password.set(ossrhPassword)
-        publicationType = "USER_MANAGED"
+        publishingType = "USER_MANAGED"
     }
+    publishAllProjectsProbablyBreakingProjectIsolation()
 }
