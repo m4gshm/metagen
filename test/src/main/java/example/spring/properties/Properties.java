@@ -10,7 +10,7 @@ import static io.github.m4gshm.meta.Meta.ConstantNameStrategy.UPPER_SNAKE_CASE;
 
 @Data
 @ConfigurationProperties("service")
-@Meta(properties = @Props(constName = UPPER_SNAKE_CASE, nameValueCustomizer = SpringPropertyDashForm.class))
+@Meta(properties = @Props(constantName = UPPER_SNAKE_CASE, nameValueCustomizer = SpringPropertyDashForm.class))
 public class Properties {
 
     boolean enabled;

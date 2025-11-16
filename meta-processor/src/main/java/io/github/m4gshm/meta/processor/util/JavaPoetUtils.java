@@ -65,6 +65,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static io.github.m4gshm.meta.Meta.ConstantNameStrategy.AS_IS;
 import static io.github.m4gshm.meta.Meta.Content.FULL;
 import static io.github.m4gshm.meta.Meta.Content.NAME;
 import static io.github.m4gshm.meta.Meta.Content.NONE;
@@ -143,8 +144,9 @@ public class JavaPoetUtils {
             var methodName = parameters.map(Params::methodName).orElse(Params.METHOD_NAME);
 
             inheritParams = Params.METHOD_NAME.equals(methodName) && paramsEnum == FULL;
+            var paramNameStrategy = getConstantNameConverter(parameters.map(Params::constantName).orElse(AS_IS));
             if (addParamsType) {
-                builder.addType(newParamsType(typeName, typeParameters, paramsEnum));
+                builder.addType(newParamsType(typeName, typeParameters, paramsEnum, paramNameStrategy));
             }
 
             var inheritedParamsFieldName = "inheritedParams";
@@ -168,7 +170,7 @@ public class JavaPoetUtils {
                         superclass.getClassName() + parentClass.map(Params.Inherited.Super::classNameSuffix)
                                 .orElse(Params.Inherited.Super.CLASS_NAME_SUFFIX), uniqueNames
                 );
-                builder.addType(newParamsType(superTypeName, superTypeParams, paramsEnum));
+                builder.addType(newParamsType(superTypeName, superTypeParams, paramsEnum, paramNameStrategy));
                 if (paramsEnum == FULL) {
                     builder.addMethod(callValuesMethod(
                             parentClass.map(Params.Inherited.Super::methodName).orElse(Params.Inherited.Super.METHOD_NAME),
@@ -199,7 +201,7 @@ public class JavaPoetUtils {
                             iface.getClassName() + interfacesParams.map(Params.Inherited.Interfaces::classNameSuffix)
                                     .orElse(Params.Inherited.Interfaces.CLASS_NAME_SUFFIX), uniqueNames
                     );
-                    builder.addType(newParamsType(ifaceParametersEnumName, iface.getTypeParameters(), paramsEnum));
+                    builder.addType(newParamsType(ifaceParametersEnumName, iface.getTypeParameters(), paramsEnum, paramNameStrategy));
                     addInheritedParams(
                             inheritedParamsFieldInitializer,
                             ClassName.get(iface.getType()),
@@ -278,8 +280,7 @@ public class JavaPoetUtils {
 
             var propertyValConverter = props.map(props1 -> getPropertyValueConverter(messager, props1)).orElse(identity());
 
-            var constantName = props.map(props1 -> props1.constName()).orElse(ConstantNameStrategy.AS_IS);
-            var constantNameConverter = getConstantNameConverter(constantName);
+            var propertyNameStrategy = getConstantNameConverter(props.map(Meta.Props::constantName).orElse(AS_IS));
 
             var finalPropertyNames = new HashSet<String>();
             for (var propertyName : orderedProperties) {
@@ -341,7 +342,7 @@ public class JavaPoetUtils {
 //                    typ = propType;
 //                }
 
-                var finalPropertyName = getUniqueName(constantNameConverter.apply(property.getName()), uniqueNames);
+                var finalPropertyName = getUniqueName(propertyNameStrategy.apply(property.getName()), uniqueNames);
                 var finalPropertyValue = propertyValConverter.apply(property.getName());
                 finalPropertyNames.add(finalPropertyName);
                 var fieldSpec = newPropertyField(propsEnum, finalPropertyName,
@@ -480,7 +481,6 @@ public class JavaPoetUtils {
 
 //        var inheritMethods = false;
         if (methodsEnum != Meta.Methods.Content.NONE) {
-            var methodsLevelUniqueNames = new HashSet<String>();
             var methodsInfo = metaMethods.get();
 //            inheritMethods = Meta.Methods.METHOD_NAME.equals(methodsInfo.methodName()) && propsEnum == FULL;
 
@@ -506,8 +506,10 @@ public class JavaPoetUtils {
 
             addInterfaceMethods(interfaces, methods, methodWeights, 1);
 
-            var orderedMethods = weightOrdered(methodWeights);
-            methodsLevelUniqueNames.addAll(orderedMethods);
+            var methodNameStrategy = getConstantNameConverter(metaMethods.map(Meta.Methods::constantName).orElse(AS_IS));
+
+            var orderedMethods = weightOrdered(methodWeights).stream().map(methodNameStrategy).toList();
+            var methodsLevelUniqueNames = new HashSet<>(orderedMethods);
 
             for (var methodName : orderedMethods) {
                 var fieldSpec = switch (methodsEnum) {
@@ -783,13 +785,17 @@ public class JavaPoetUtils {
         return CodeBlock.of("$T.class", type);
     }
 
-    private static TypeSpec newParamsType(String typeName, List<Param> beanTypeParameters, Meta.Content content) {
+    private static TypeSpec newParamsType(String typeName, List<Param> beanTypeParameters,
+                                          Meta.Content content, Function<String, String> paramNameStrategy) {
         var className = ClassName.get("", typeName);
         var typeVariable = TypeVariableName.get("T");
-        var typesBuilder = content == FULL ? typeAwareClass(className, typeVariable) : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
+        var typesBuilder = content == FULL
+                ? typeAwareClass(className, typeVariable)
+                : classBuilder(typeName).addModifiers(PUBLIC, STATIC);
         var paramNames = new LinkedHashSet<String>();
+
         for (var param : beanTypeParameters) {
-            var name = param.getName().getSimpleName().toString();
+            var name = paramNameStrategy.apply(param.getName().getSimpleName().toString());
             paramNames.add(name);
             var type = TypeName.get(param.getEvaluatedType());
             var unboxedTypeVarName = unboxedTypeVarName(type);

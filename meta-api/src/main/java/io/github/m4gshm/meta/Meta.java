@@ -90,6 +90,9 @@ public @interface Meta {
         FULL
     }
 
+    /**
+     * Specifies name style for generated constants.
+     */
     enum ConstantNameStrategy {
         AS_IS,
         SNAKE_CASE,
@@ -110,7 +113,7 @@ public @interface Meta {
 
         String methodName() default METHOD_NAME;
 
-        ConstantNameStrategy constName() default AS_IS;
+        ConstantNameStrategy constantName() default AS_IS;
 
         Class<? extends Function<String, String>> nameValueCustomizer() default AsIs.class;
 
@@ -132,6 +135,8 @@ public @interface Meta {
         String className() default CLASS_NAME;
 
         String methodName() default METHOD_NAME;
+
+        ConstantNameStrategy constantName() default AS_IS;
 
         Inherited inherited() default @Inherited(
                 parentClass = @Inherited.Super(enumerate = true), interfaces = @Inherited.Interfaces(enumerate = true));
@@ -181,6 +186,9 @@ public @interface Meta {
         Content value();
 
         String className() default CLASS_NAME;
+
+        ConstantNameStrategy constantName() default AS_IS;
+
 
         /**
          * Specifies the metadata content to be generated.

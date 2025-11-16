@@ -18,4 +18,19 @@ public class SnakeCaseTest {
     public void camelToUpperSnakeCaseConvert() {
         assertEquals("ANY_JAVA_NAME", upperLevelConverter.apply("anyJavaName"));
     }
+
+    @Test
+    public void pascalToSnakeCaseConvert() {
+        assertEquals("ANY_JAVA_NAME", upperLevelConverter.apply("AnyJavaName"));
+    }
+
+    @Test
+    public void upperToUpperSnakeCaseConvert() {
+        assertEquals("ID", upperLevelConverter.apply("ID"));
+    }
+
+    @Test
+    public void upperSnakeCaseToUpperSnakeCaseConvert() {
+        assertEquals("ANY_UPPER", upperLevelConverter.apply("ANY_UPPER"));
+    }
 }
