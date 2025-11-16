@@ -1,7 +1,6 @@
 # Metagen (under construction)
 
-Enumerated constants generator, based on bean properties and type
-parameters.
+Enumerated constants generator, based on bean props and type parameters.
 
 Requires Java 17 or higher.
 
@@ -30,16 +29,16 @@ Input:
 package example.simple;
 
 
+import io.github.m4gshm.meta.Meta.Props;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
-import meta.Meta;
-import meta.Meta.Params;
-import meta.Meta.Props;
+import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.Meta.Params;
 
 import static lombok.AccessLevel.NONE;
-import static meta.Meta.Content.NAME;
-import static meta.Meta.Content.TYPE;
+import static io.github.m4gshm.meta.Meta.Content.NAME;
+import static io.github.m4gshm.meta.Meta.Content.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))
@@ -53,7 +52,7 @@ public class User implements IdAware<Long> {
     @Setter(NONE)
     private Integer version; // excluded private field
 
-    @Meta(properties = @Props(NAME))
+    @Meta
     public record Address(String postalCode, String city, String street) {
         public String getFullAddress() {
             return postalCode + ", " + city + ", " + street;
@@ -82,15 +81,21 @@ import java.lang.String;
 import java.util.List;
 import javax.annotation.processing.Generated;
 
-@Generated("meta.Meta")
+@Generated("io.github.m4gshm.meta.Meta")
 public final class UserMeta {
-  public final Class<User> type = User.class;
+  public static final Class<User> type = User.class;
 
   UserMeta() {
   }
 
   public static class IdAwareParam {
     public static final Class<Long> ID = Long.class;
+
+    private static final List<Class<?>> values = List.of(ID);
+
+    public static final List<Class<?>> values() {
+      return values;
+    }
   }
 
   public static class Prop {
@@ -104,41 +109,38 @@ public final class UserMeta {
 
     private static final List<String> values = List.of(id, address, name, age);
 
+    Prop() {
+    }
+
     public static final List<String> values() {
       return values;
     }
   }
-}
-```
 
-``` java
-package example.simple;
+  @Generated("io.github.m4gshm.meta.Meta")
+  public final class AddressMeta {
+    public static final Class<User.Address> type = User.Address.class;
 
-import java.lang.Class;
-import java.lang.String;
-import java.util.List;
-import javax.annotation.processing.Generated;
+    AddressMeta() {
+    }
 
-@Generated("meta.Meta")
-public final class UserAddressMeta {
-  public final Class<User.Address> type = User.Address.class;
+    public static class Prop {
+      public static final String postalCode = "postalCode";
 
-  UserAddressMeta() {
-  }
+      public static final String city = "city";
 
-  public static class Prop {
-    public static final String postalCode = "postalCode";
+      public static final String street = "street";
 
-    public static final String city = "city";
+      public static final String fullAddress = "fullAddress";
 
-    public static final String street = "street";
+      private static final List<String> values = List.of(postalCode, city, street, fullAddress);
 
-    public static final String fullAddress = "fullAddress";
+      Prop() {
+      }
 
-    private static final List<String> values = List.of(postalCode, city, street, fullAddress);
-
-    public static final List<String> values() {
-      return values;
+      public static final List<String> values() {
+        return values;
+      }
     }
   }
 }

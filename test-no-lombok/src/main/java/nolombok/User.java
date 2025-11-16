@@ -1,12 +1,12 @@
 package nolombok;
 
 
-import meta.Meta;
-import meta.Meta.Params;
-import meta.Meta.Props;
+import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.Meta.Params;
+import io.github.m4gshm.meta.Meta.Props;
 
-import static meta.Meta.Content.NAME;
-import static meta.Meta.Content.TYPE;
+import static io.github.m4gshm.meta.Meta.Content.NAME;
+import static io.github.m4gshm.meta.Meta.Content.TYPE;
 
 @Meta(properties = @Props(NAME), params = @Params(TYPE))
 public class User implements IdAware<Long> {

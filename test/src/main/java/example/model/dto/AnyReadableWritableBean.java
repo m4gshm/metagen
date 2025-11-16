@@ -1,15 +1,18 @@
 package example.model.dto;
 
+import io.github.m4gshm.meta.Meta.Props;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import meta.Meta;
+import io.github.m4gshm.meta.Meta;
 
 import java.util.List;
+
+import static io.github.m4gshm.meta.Meta.Content.FULL;
 
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-@Meta(builder = @Meta.Builder(generateMeta = true))
+@Meta(properties = @Props(FULL), builder = @Meta.Builder(generateMeta = true))
 public class AnyReadableWritableBean {
 
     @Getter

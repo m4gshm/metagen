@@ -1,2 +1,2 @@
-meta.processor.MetaAnnotationProcessor
-meta.processor.ModuleAnnotationProcessor
+io.github.m4gshm.meta.processor.MetaAnnotationProcessor
+io.github.m4gshm.meta.processor.ModuleAnnotationProcessor

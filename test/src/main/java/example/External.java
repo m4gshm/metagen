@@ -1,7 +1,7 @@
 package example;
 
 import lombok.Data;
-import meta.Meta;
+import io.github.m4gshm.meta.Meta;
 
 public class External {
 

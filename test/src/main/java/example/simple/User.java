@@ -1,16 +1,16 @@
 package example.simple;
 
 
+import io.github.m4gshm.meta.Meta.Props;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
-import meta.Meta;
-import meta.Meta.Params;
-import meta.Meta.Props;
+import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.Meta.Params;
 
 import static lombok.AccessLevel.NONE;
-import static meta.Meta.Content.NAME;
-import static meta.Meta.Content.TYPE;
+import static io.github.m4gshm.meta.Meta.Content.NAME;
+import static io.github.m4gshm.meta.Meta.Content.TYPE;
 
 @Data
 @Meta(properties = @Props(NAME), params = @Params(TYPE))
@@ -24,7 +24,7 @@ public class User implements IdAware<Long> {
     @Setter(NONE)
     private Integer version; // excluded private field
 
-    @Meta(properties = @Props(NAME))
+    @Meta
     public record Address(String postalCode, String city, String street) {
         public String getFullAddress() {
             return postalCode + ", " + city + ", " + street;

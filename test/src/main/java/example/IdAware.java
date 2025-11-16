@@ -1,6 +1,6 @@
 package example;
 
-import meta.Meta;
+import io.github.m4gshm.meta.Meta;
 
 import java.io.Serializable;
 

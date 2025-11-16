@@ -19,9 +19,9 @@ dependencies {
     ecj(project(":meta-processor"))
     ecj("org.eclipse.jdt:ecj:3.37.0")
 
-    testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.17.0")
+    testImplementation("org.mockito:mockito-junit-jupiter")
+//    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.test {
@@ -34,3 +34,10 @@ tasks.compileJava {
 //    options.forkOptions.jvmArgs = listOf("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005")
 }
 
+testing {
+    suites {
+        "test"(JvmTestSuite::class) {
+            useJUnitJupiter()
+        }
+    }
+}

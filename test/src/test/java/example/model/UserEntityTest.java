@@ -3,8 +3,8 @@ package example.model;
 import example.model.UserEntityMeta.BuilderMeta;
 import example.model.UserEntityMeta.Column;
 import lombok.SneakyThrows;
-import meta.Meta;
-import meta.util.SuperParametersAware;
+import io.github.m4gshm.meta.Meta;
+import io.github.m4gshm.meta.SuperParametersAware;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -44,7 +44,7 @@ public class UserEntityTest {
         assertEquals("Bob", name.get(bean));
         assertArrayEquals(tags, UserEntityMeta.Prop.tags.get(bean));
         assertSame(address, UserEntityMeta.Prop.address.get(bean));
-        assertEquals("123", UserEntityAddressMeta.Prop.postalCode.get(address));
+        assertEquals("123", UserEntityMeta.AddressMeta.Prop.postalCode.get(address));
     }
 
     @Test
